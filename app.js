@@ -1,595 +1,450 @@
+import { runHmmRegime, getTradeDecision } from './signal-engine.js';
+
 const state = {
-  clientId: localStorage.getItem('saf-client-id') || null,
   appName: 'Set & Forget',
-  selectedPairKey: null,
-  selectedSignal: null,
-  latestMap: {},
-  watchlist: [],
-  trades: [],
-  history: [],
-  positions: {},
-  account: { startingBalance: 10000, realizedPnl: 0 },
-  settings: {},
-  push: { configured: false, publicKey: null },
-  realtime: { enabled: false, authUrl: null },
-  swRegistration: null,
-  refreshTimer: null,
+  pairs: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT'],
+  currentPair: 'BTCUSDT',
+  timeframe: '15m',
+  size: 100,
+  threshold: 65,
+  refreshSeconds: 15,
+  mode: 'manual',
+  signal: { state: 'NO TRADE', bull: 0, bear: 0, chop: 0, confidence: 0, spread: 0, quality: 0, adaptiveThreshold: 65, decision: 'HOLD' },
+  lastPrice: null,
+  markets: [],
+  signalHistory: load('sf_signal_history', []),
+  trades: load('sf_trades', []),
+  openPosition: load('sf_open_position', null),
+  pnl: load('sf_realised_pnl', 0),
   ably: null,
-  realtimeChannels: [],
+  channel: null
 };
 
-const els = {
-  pairSelect: document.getElementById('pairSelect'),
-  tradeSizeInput: document.getElementById('tradeSizeInput'),
-  settingsToggle: document.getElementById('settingsToggle'),
-  settingsClose: document.getElementById('settingsClose'),
-  settingsPanel: document.getElementById('settingsPanel'),
-  watchSymbolInput: document.getElementById('watchSymbolInput'),
-  watchIntervalInput: document.getElementById('watchIntervalInput'),
-  addWatchBtn: document.getElementById('addWatchBtn'),
-  autoTradeToggle: document.getElementById('autoTradeToggle'),
-  exitOnChopToggle: document.getElementById('exitOnChopToggle'),
-  pushBtn: document.getElementById('pushBtn'),
-  minConfidenceInput: document.getElementById('minConfidenceInput'),
-  lengthInput: document.getElementById('lengthInput'),
-  bullStayInput: document.getElementById('bullStayInput'),
-  bearStayInput: document.getElementById('bearStayInput'),
-  chopStayInput: document.getElementById('chopStayInput'),
-  saveSettingsBtn: document.getElementById('saveSettingsBtn'),
-  heroPairText: document.getElementById('heroPairText'),
-  signalBadge: document.getElementById('signalBadge'),
-  lastPriceText: document.getElementById('lastPriceText'),
-  regimeText: document.getElementById('regimeText'),
-  updatedText: document.getElementById('updatedText'),
-  bullPct: document.getElementById('bullPct'),
-  bearPct: document.getElementById('bearPct'),
-  chopPct: document.getElementById('chopPct'),
-  buyBtn: document.getElementById('buyBtn'),
-  sellBtn: document.getElementById('sellBtn'),
-  closeBtn: document.getElementById('closeBtn'),
-  refreshBtn: document.getElementById('refreshBtn'),
-  modeText: document.getElementById('modeText'),
-  confidenceText: document.getElementById('confidenceText'),
-  realizedText: document.getElementById('realizedText'),
-  positionText: document.getElementById('positionText'),
-  positionCard: document.getElementById('positionCard'),
-  watchlistGrid: document.getElementById('watchlistGrid'),
-  historyList: document.getElementById('historyList'),
-  tradeList: document.getElementById('tradeList'),
-  tabs: Array.from(document.querySelectorAll('.tab')),
-  tabPanels: Array.from(document.querySelectorAll('.tab-panel')),
-  statusBar: document.getElementById('statusBar'),
+const el = {
+  appName: q('#appName'),
+  pairSelect: q('#pairSelect'),
+  sizeInput: q('#sizeInput'),
+  timeframeSelect: q('#timeframeSelect'),
+  modeSelect: q('#modeSelect'),
+  thresholdInput: q('#thresholdInput'),
+  refreshInput: q('#refreshInput'),
+  gearBtn: q('#gearBtn'),
+  settings: q('#settings'),
+  pairBig: q('#pairBig'),
+  stateBadge: q('#stateBadge'),
+  lastPrice: q('#lastPrice'),
+  statusText: q('#statusText'),
+  bullPct: q('#bullPct'),
+  bearPct: q('#bearPct'),
+  chopPct: q('#chopPct'),
+  qualityValue: q('#qualityValue'),
+  adaptiveValue: q('#adaptiveValue'),
+  buyBtn: q('#buyBtn'),
+  sellBtn: q('#sellBtn'),
+  closeBtn: q('#closeBtn'),
+  refreshBtn: q('#refreshBtn'),
+  notice: q('#notice'),
+  modeStat: q('#modeStat'),
+  confidenceStat: q('#confidenceStat'),
+  qualityStat: q('#qualityStat'),
+  adaptiveStat: q('#adaptiveStat'),
+  pnlStat: q('#pnlStat'),
+  positionStat: q('#positionStat'),
+  dayReturnStat: q('#dayReturnStat'),
+  weekReturnStat: q('#weekReturnStat'),
+  marketsList: q('#marketsList'),
+  signalsList: q('#signalsList'),
+  tradesList: q('#tradesList')
 };
 
-function showStatus(message, tone = 'info', persistMs = 2600) {
-  if (!message) {
-    els.statusBar.textContent = '';
-    els.statusBar.className = 'status-bar hidden';
-    return;
+async function boot() {
+  bindUI();
+  await loadConfig();
+  populatePairs();
+  renderAll();
+  await setupAbly();
+  await refreshAll();
+  setInterval(() => refreshAll(), state.refreshSeconds * 1000);
+}
+
+function bindUI() {
+  el.gearBtn.addEventListener('click', () => el.settings.classList.toggle('open'));
+  el.pairSelect.addEventListener('change', async (e) => { state.currentPair = e.target.value; renderHero(); await refreshActivePair(); });
+  el.sizeInput.addEventListener('change', (e) => { state.size = Number(e.target.value || 100); });
+  el.timeframeSelect.addEventListener('change', async (e) => { state.timeframe = e.target.value; renderHero(); await refreshAll(); });
+  el.modeSelect.addEventListener('change', (e) => { state.mode = e.target.value; renderOverview(); });
+  el.thresholdInput.addEventListener('change', (e) => { state.threshold = Number(e.target.value || 65); });
+  el.refreshInput.addEventListener('change', (e) => { state.refreshSeconds = Number(e.target.value || 15); });
+  el.buyBtn.addEventListener('click', () => manualTrade('BUY'));
+  el.sellBtn.addEventListener('click', () => manualTrade('SELL'));
+  el.closeBtn.addEventListener('click', closePosition);
+  el.refreshBtn.addEventListener('click', refreshAll);
+  document.querySelectorAll('.tab').forEach((btn) => btn.addEventListener('click', () => setTab(btn.dataset.tab)));
+}
+
+async function loadConfig() {
+  try {
+    const res = await fetch('/api/config');
+    if (!res.ok) throw new Error('Config failed');
+    const cfg = await res.json();
+    state.appName = cfg.appName || state.appName;
+    state.pairs = cfg.defaultPairs?.length ? cfg.defaultPairs : state.pairs;
+    state.currentPair = state.pairs[0];
+    state.timeframe = cfg.defaultTimeframe || state.timeframe;
+    el.appName.textContent = state.appName;
+    el.timeframeSelect.value = state.timeframe;
+  } catch {
+    el.notice.textContent = 'Using local defaults. Config route not available.';
   }
-  els.statusBar.textContent = message;
-  els.statusBar.className = `status-bar ${tone === 'error' ? 'error' : tone === 'success' ? 'success' : ''}`.trim();
-  if (persistMs > 0) {
-    clearTimeout(showStatus._timer);
-    showStatus._timer = setTimeout(() => showStatus(''), persistMs);
-  }
 }
 
-function fmtNumber(value, digits = 2) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return '-';
-  return Number(value).toLocaleString(undefined, {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
-}
-
-function fmtPrice(value) {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return '-';
-  if (Math.abs(num) < 1) return fmtNumber(num, 6);
-  if (Math.abs(num) < 100) return fmtNumber(num, 4);
-  return fmtNumber(num, 2);
-}
-
-function fmtPct(value) { return `${fmtNumber(value, 2)}%`; }
-function fmtDate(value) {
-  const date = new Date(value);
-  return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-}
-
-function localClientId() {
-  if (!state.clientId) {
-    state.clientId = `client_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-    localStorage.setItem('saf-client-id', state.clientId);
-  }
-  return state.clientId;
-}
-
-function getSelectedPair() {
-  const fallback = state.selectedPairKey || els.pairSelect.value || 'BTCUSDT|15m';
-  const [symbol, interval] = fallback.split('|');
-  return { symbol, interval, pairKey: fallback };
-}
-
-async function api(url, options = {}) {
-  const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-    ...options,
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || `Request failed: ${response.status}`);
-  return data;
-}
-
-function renderPairSelect() {
-  els.pairSelect.innerHTML = '';
-  state.watchlist.forEach(item => {
-    const key = `${item.symbol}|${item.interval}`;
+function populatePairs() {
+  el.pairSelect.innerHTML = '';
+  state.pairs.forEach((pair) => {
     const option = document.createElement('option');
-    option.value = key;
-    option.textContent = `${item.symbol} · ${item.interval}`;
-    option.selected = key === state.selectedPairKey;
-    els.pairSelect.appendChild(option);
+    option.value = pair;
+    option.textContent = pair;
+    el.pairSelect.appendChild(option);
   });
+  el.pairSelect.value = state.currentPair;
 }
 
-function renderSignal() {
-  const pair = getSelectedPair();
-  const latest = state.latestMap[pair.pairKey];
-  els.heroPairText.textContent = `${pair.symbol} · ${pair.interval}`;
+async function setupAbly() {
+  try {
+    const res = await fetch('/api/ably-token');
+    const data = await res.json();
+    if (!data.enabled || !window.Ably) {
+      el.notice.textContent = 'Ably not enabled. Live engine still works locally.';
+      return;
+    }
+    state.ably = new window.Ably.Realtime({ authCallback: async (_params, cb) => cb(null, data.tokenRequest) });
+    state.channel = state.ably.channels.get('signals');
+    state.channel.subscribe('signal', (msg) => {
+      if (msg?.data?.pair !== state.currentPair) return;
+      state.signal = msg.data.signal;
+      state.lastPrice = msg.data.lastPrice;
+      renderHero();
+    });
+    el.notice.textContent = 'Ably realtime connected.';
+  } catch {
+    el.notice.textContent = 'Ably token route unavailable. Local mode active.';
+  }
+}
 
-  if (!latest) {
-    els.signalBadge.textContent = 'FLAT';
-    els.signalBadge.className = 'signal-badge neutral';
-    els.lastPriceText.textContent = '-';
-    els.regimeText.textContent = 'Waiting for live market data';
-    els.updatedText.textContent = 'Not updated yet';
-    els.bullPct.textContent = '0%';
-    els.bearPct.textContent = '0%';
-    els.chopPct.textContent = '0%';
-    els.confidenceText.textContent = '-';
+async function fetchKlines(symbol = 'BTCUSDT', interval = '15m', limit = 250) {
+  const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+  if (!res.ok) throw new Error(`Klines failed for ${symbol}`);
+  const rows = await res.json();
+  return rows.map((k) => ({
+    openTime: k[0],
+    open: Number(k[1]),
+    high: Number(k[2]),
+    low: Number(k[3]),
+    close: Number(k[4]),
+    volume: Number(k[5]),
+    closeTime: k[6]
+  }));
+}
+
+function calculateReturnPercent(windowMs, pair = null) {
+  const now = Date.now();
+  const closed = state.trades.filter((t) => t.type === 'CLOSE' && (!pair || t.pair === pair) && now - new Date(t.at).getTime() <= windowMs);
+  if (!closed.length) return { pct: 0, count: 0 };
+  const totalPnl = closed.reduce((sum, t) => sum + Number(t.pnl || 0), 0);
+  const totalCapital = closed.reduce((sum, t) => sum + Math.abs(Number(t.entryPrice || 0) * Number(t.size || 0)), 0);
+  if (!totalCapital) return { pct: 0, count: closed.length };
+  return { pct: (totalPnl / totalCapital) * 100, count: closed.length };
+}
+
+function enrichSignal(signal, pair) {
+  const recent = calculateReturnPercent(7 * 24 * 60 * 60 * 1000, pair);
+  const decisionBundle = getTradeDecision(signal, {
+    baseThreshold: state.threshold,
+    recentReturnPct: recent.pct,
+    recentTradeCount: recent.count
+  });
+  return {
+    ...signal,
+    quality: decisionBundle.quality,
+    adaptiveThreshold: decisionBundle.adaptiveThreshold,
+    decision: decisionBundle.decision
+  };
+}
+
+async function refreshActivePair() {
+  try {
+    el.statusText.textContent = 'Refreshing active pair…';
+    const candles = await fetchKlines(state.currentPair, state.timeframe, 250);
+    const closed = candles.slice(0, -1);
+    const baseSignal = runHmmRegime(closed);
+    const signal = enrichSignal(baseSignal, state.currentPair);
+    const lastPrice = closed[closed.length - 1]?.close ?? null;
+
+    state.signal = signal;
+    state.lastPrice = lastPrice;
+
+    logSignal({ pair: state.currentPair, timeframe: state.timeframe, signal, lastPrice });
+    maybeAutoTrade();
+    publishSignal();
+    renderAll();
+  } catch (error) {
+    el.statusText.textContent = error.message || 'Failed to refresh';
+  }
+}
+
+async function refreshWatchlist() {
+  const out = [];
+  for (const pair of state.pairs) {
+    try {
+      const candles = await fetchKlines(pair, state.timeframe, 250);
+      const closed = candles.slice(0, -1);
+      const baseSignal = runHmmRegime(closed);
+      const signal = enrichSignal(baseSignal, pair);
+      const lastPrice = closed[closed.length - 1]?.close ?? null;
+      out.push({ pair, timeframe: state.timeframe, lastPrice, signal, updatedAt: new Date().toISOString() });
+    } catch (error) {
+      out.push({
+        pair,
+        timeframe: state.timeframe,
+        lastPrice: null,
+        signal: { state: 'NO TRADE', bull: 0, bear: 0, chop: 0, confidence: 0, spread: 0, quality: 0, adaptiveThreshold: state.threshold, decision: 'HOLD' },
+        updatedAt: new Date().toISOString(),
+        error: error.message
+      });
+    }
+  }
+  state.markets = out.sort((a, b) => (b.signal.quality || 0) - (a.signal.quality || 0));
+  renderMarkets();
+}
+
+async function refreshAll() {
+  await refreshActivePair();
+  await refreshWatchlist();
+  renderAll();
+}
+
+function maybeAutoTrade() {
+  if (state.mode !== 'auto') return;
+  const d = state.signal.decision;
+  if (d === 'BUY') executeTrade('BUY', 'auto');
+  if (d === 'SELL') executeTrade('SELL', 'auto');
+}
+
+function manualTrade(side) { executeTrade(side, 'manual'); }
+
+function executeTrade(side, source) {
+  const price = state.lastPrice;
+  if (!price) return;
+  if (state.openPosition && state.openPosition.side === side) {
+    el.notice.textContent = `Already in ${side} position.`;
+    return;
+  }
+  if (state.openPosition && state.openPosition.side !== side) closePosition();
+
+  state.openPosition = {
+    pair: state.currentPair,
+    side,
+    size: state.size,
+    entryPrice: price,
+    openedAt: new Date().toISOString(),
+    source
+  };
+  save('sf_open_position', state.openPosition);
+
+  state.trades.unshift({
+    type: 'OPEN',
+    pair: state.currentPair,
+    side,
+    size: state.size,
+    price,
+    source,
+    at: new Date().toISOString()
+  });
+  keepTrades();
+  renderAll();
+  el.notice.textContent = `${source === 'auto' ? 'Auto' : 'Manual'} ${side} opened at ${fmt(price)}.`;
+}
+
+function closePosition() {
+  const pos = state.openPosition;
+  if (!pos || !state.lastPrice) {
+    el.notice.textContent = 'No open position to close.';
     return;
   }
 
-  const tone = latest.signal === 'LONG' ? 'long' : latest.signal === 'SHORT' ? 'short' : 'neutral';
-  els.signalBadge.textContent = latest.signal;
-  els.signalBadge.className = `signal-badge ${tone}`;
-  els.lastPriceText.textContent = fmtPrice(latest.price);
-  els.regimeText.textContent = `${latest.regime} · ${fmtPct(latest.confidence)} confidence`;
-  els.updatedText.textContent = `Updated ${fmtDate(latest.time || latest.ts || Date.now())}`;
-  els.bullPct.textContent = fmtPct(latest.bull);
-  els.bearPct.textContent = fmtPct(latest.bear);
-  els.chopPct.textContent = fmtPct(latest.chop);
-  els.confidenceText.textContent = fmtPct(latest.confidence);
-  state.selectedSignal = latest.signal;
+  const exit = state.lastPrice;
+  const pnl = pos.side === 'BUY'
+    ? (exit - pos.entryPrice) * pos.size
+    : (pos.entryPrice - exit) * pos.size;
+
+  state.pnl += pnl;
+  save('sf_realised_pnl', state.pnl);
+
+  state.trades.unshift({
+    type: 'CLOSE',
+    pair: pos.pair,
+    side: pos.side,
+    size: pos.size,
+    entryPrice: pos.entryPrice,
+    exitPrice: exit,
+    pnl,
+    source: pos.source,
+    at: new Date().toISOString()
+  });
+  keepTrades();
+  state.openPosition = null;
+  save('sf_open_position', null);
+  renderAll();
+  el.notice.textContent = `Position closed. Realised PnL ${fmt(pnl)}.`;
 }
 
-function renderWatchlist() {
-  els.watchlistGrid.innerHTML = '';
-  state.watchlist.forEach(item => {
-    const key = `${item.symbol}|${item.interval}`;
-    const latest = state.latestMap[key];
-    const selected = key === state.selectedPairKey;
-    const el = document.createElement('article');
-    el.className = `watch-item ${selected ? 'selected' : ''}`;
-    const tone = latest ? latest.signal : 'FLAT';
-    el.innerHTML = `
-      <div class="watch-head">
+function publishSignal() {
+  if (!state.channel) return;
+  state.channel.publish('signal', {
+    pair: state.currentPair,
+    signal: state.signal,
+    lastPrice: state.lastPrice,
+    at: new Date().toISOString()
+  });
+}
+
+function logSignal(entry) {
+  state.signalHistory.unshift({ ...entry, at: new Date().toISOString() });
+  state.signalHistory = state.signalHistory.slice(0, 75);
+  save('sf_signal_history', state.signalHistory);
+}
+
+function keepTrades() {
+  state.trades = state.trades.slice(0, 150);
+  save('sf_trades', state.trades);
+}
+
+function renderAll() {
+  renderHero();
+  renderOverview();
+  renderSignals();
+  renderTrades();
+  renderMarkets();
+}
+
+function renderHero() {
+  el.pairBig.textContent = `${state.currentPair} • ${state.timeframe}`;
+  el.stateBadge.textContent = state.signal.state;
+  el.lastPrice.textContent = state.lastPrice ? fmt(state.lastPrice) : '–';
+  el.statusText.textContent = state.signal.reason === 'OK'
+    ? `${state.signal.decision || 'HOLD'} • Confidence ${state.signal.confidence}% • Quality ${state.signal.quality}`
+    : state.signal.reason || 'Waiting for live market data';
+  el.bullPct.textContent = `${state.signal.bull ?? 0}%`;
+  el.bearPct.textContent = `${state.signal.bear ?? 0}%`;
+  el.chopPct.textContent = `${state.signal.chop ?? 0}%`;
+  el.qualityValue.textContent = `${state.signal.quality ?? 0}`;
+  el.adaptiveValue.textContent = `${state.signal.adaptiveThreshold ?? state.threshold}`;
+}
+
+function renderOverview() {
+  el.modeStat.textContent = state.mode[0].toUpperCase() + state.mode.slice(1);
+  el.confidenceStat.textContent = state.signal.confidence ? `${state.signal.confidence}%` : '-';
+  el.qualityStat.textContent = `${state.signal.quality ?? 0}`;
+  el.adaptiveStat.textContent = `${state.signal.adaptiveThreshold ?? state.threshold}`;
+  el.pnlStat.textContent = fmt(state.pnl);
+  el.positionStat.textContent = state.openPosition ? `${state.openPosition.side} @ ${fmt(state.openPosition.entryPrice)}` : 'None';
+
+  const dayRet = calculateReturnPercent(24 * 60 * 60 * 1000).pct;
+  const weekRet = calculateReturnPercent(7 * 24 * 60 * 60 * 1000).pct;
+  el.dayReturnStat.textContent = `${dayRet.toFixed(2)}%`;
+  el.weekReturnStat.textContent = `${weekRet.toFixed(2)}%`;
+  el.dayReturnStat.className = `big ${dayRet >= 0 ? 'good' : 'bad'}`;
+  el.weekReturnStat.className = `big ${weekRet >= 0 ? 'good' : 'bad'}`;
+}
+
+function renderMarkets() {
+  el.marketsList.innerHTML = '';
+  state.markets.forEach((m) => {
+    const item = document.createElement('div');
+    item.className = 'item';
+    item.innerHTML = `
+      <div class="row">
         <div>
-          <strong>${item.symbol}</strong>
-          <div class="small-meta">${item.interval}</div>
+          <div><strong>${m.pair}</strong></div>
+          <div class="small muted">${m.timeframe} • ${m.lastPrice ? fmt(m.lastPrice) : '–'}</div>
         </div>
-        <span class="feed-pill">${tone}</span>
+        <div class="pill">${m.signal.state}</div>
       </div>
-      <p class="feed-copy">${latest ? `${latest.regime} · ${fmtPct(latest.confidence)} · ${fmtPrice(latest.price)}` : 'No live read yet'}</p>
-      <div class="watch-actions">
-        <button class="inline-btn" data-action="select" data-key="${key}">Open</button>
-        <button class="inline-btn" data-action="remove" data-key="${key}">Remove</button>
+      <div class="row" style="margin-top:10px">
+        <div class="small muted">Quality ${m.signal.quality} • Confidence ${m.signal.confidence}%</div>
+        <div class="small ${m.signal.decision === 'BUY' ? 'good' : m.signal.decision === 'SELL' ? 'bad' : 'muted'}">${m.signal.decision}</div>
       </div>
     `;
-    els.watchlistGrid.appendChild(el);
+    el.marketsList.appendChild(item);
   });
 }
 
-function renderHistory() {
-  els.historyList.innerHTML = '';
-  if (!state.history.length) {
-    els.historyList.innerHTML = `<article class="feed-item"><p class="feed-copy">No saved signal flips yet.</p></article>`;
-    return;
-  }
-  state.history.forEach(item => {
-    const el = document.createElement('article');
-    el.className = 'feed-item';
-    el.innerHTML = `
-      <div class="feed-top">
-        <strong>${item.symbol} · ${item.interval}</strong>
-        <span class="feed-pill">${item.signal}</span>
+function renderSignals() {
+  el.signalsList.innerHTML = '';
+  state.signalHistory.slice(0, 25).forEach((s) => {
+    const item = document.createElement('div');
+    item.className = 'item';
+    item.innerHTML = `
+      <div class="row">
+        <div>
+          <div><strong>${s.pair}</strong></div>
+          <div class="small muted">${new Date(s.at).toLocaleString()}</div>
+        </div>
+        <div class="pill">${s.signal.state}</div>
       </div>
-      <p class="feed-copy"><strong>${item.regime}</strong> at ${fmtPrice(item.price)} · ${fmtPct(item.confidence)} confidence</p>
-      <p class="small-meta">${fmtDate(item.ts || item.time || Date.now())}</p>
+      <div class="row" style="margin-top:10px">
+        <div class="small muted">Q ${s.signal.quality} • Thr ${s.signal.adaptiveThreshold} • Bull ${s.signal.bull}% • Bear ${s.signal.bear}%</div>
+        <div class="small muted">${s.signal.decision || 'HOLD'}</div>
+      </div>
     `;
-    els.historyList.appendChild(el);
+    el.signalsList.appendChild(item);
   });
 }
 
 function renderTrades() {
-  els.tradeList.innerHTML = '';
-  if (!state.trades.length) {
-    els.tradeList.innerHTML = `<article class="feed-item"><p class="feed-copy">No trades yet. Manual and auto trades will land here.</p></article>`;
-    return;
-  }
-  state.trades.forEach(item => {
-    const pnl = Number(item.realizedPnl || 0);
-    const pnlText = pnl ? ` · PnL ${fmtNumber(pnl, 2)}` : '';
-    const el = document.createElement('article');
-    el.className = 'feed-item';
-    el.innerHTML = `
-      <div class="feed-top">
-        <strong>${item.action} · ${item.symbol} ${item.interval}</strong>
-        <span class="feed-pill">${item.mode}</span>
+  el.tradesList.innerHTML = '';
+  state.trades.slice(0, 25).forEach((t) => {
+    const price = t.price ?? t.exitPrice ?? t.entryPrice;
+    const extra = t.type === 'CLOSE' ? ` • PnL ${fmt(t.pnl)}` : '';
+    const item = document.createElement('div');
+    item.className = 'item';
+    item.innerHTML = `
+      <div class="row">
+        <div>
+          <div><strong>${t.type} ${t.side}</strong></div>
+          <div class="small muted">${t.pair} • ${t.source} • ${new Date(t.at).toLocaleString()}</div>
+        </div>
+        <div class="pill">${fmt(price)}</div>
       </div>
-      <p class="feed-copy">${item.side || ''} at <strong>${fmtPrice(item.price)}</strong> · size <strong>${fmtNumber(item.sizeQuote, 2)}</strong>${pnlText}</p>
-      <p class="small-meta">${fmtDate(item.ts)}</p>
+      <div class="small muted" style="margin-top:10px">Size ${t.size}${extra}</div>
     `;
-    els.tradeList.appendChild(el);
+    el.tradesList.appendChild(item);
   });
 }
 
-function updateOverview() {
-  const pair = getSelectedPair();
-  const position = state.positions[pair.pairKey];
-  els.modeText.textContent = state.settings.autoTrade ? 'Auto' : 'Manual';
-  els.realizedText.textContent = fmtNumber(state.account.realizedPnl || 0, 2);
-  els.positionText.textContent = position ? `${position.side} · ${fmtPrice(position.entryPrice)}` : 'None';
-
-  if (!position) {
-    els.positionCard.className = 'position-card empty';
-    els.positionCard.textContent = 'No open position.';
-  } else {
-    els.positionCard.className = 'position-card';
-    els.positionCard.innerHTML = `
-      <div class="feed-top">
-        <strong>${position.side}</strong>
-        <span class="feed-pill">${fmtNumber(position.sizeQuote, 2)} size</span>
-      </div>
-      <p class="feed-copy">Entry <strong>${fmtPrice(position.entryPrice)}</strong> · Qty <strong>${fmtNumber(position.qty, 6)}</strong></p>
-    `;
-  }
-
-  renderWatchlist();
-  renderTrades();
+function setTab(tab) {
+  document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+  q('#overviewPanel').classList.toggle('hidden', tab !== 'overview');
+  q('#marketsPanel').classList.toggle('hidden', tab !== 'markets');
+  q('#signalsPanel').classList.toggle('hidden', tab !== 'signals');
+  q('#tradesPanel').classList.toggle('hidden', tab !== 'trades');
+  q('#howPanel').classList.toggle('hidden', tab !== 'how');
 }
 
-async function loadAppState() {
-  const data = await api(`/api/state?clientId=${encodeURIComponent(localClientId())}`);
-  state.clientId = data.clientId;
-  localStorage.setItem('saf-client-id', data.clientId);
-  state.appName = data.appName || 'Set & Forget';
-  state.watchlist = data.watchlist || [];
-  state.selectedPairKey = data.selectedPairKey || (state.watchlist[0] ? `${state.watchlist[0].symbol}|${state.watchlist[0].interval}` : 'BTCUSDT|15m');
-  state.trades = data.trades || [];
-  state.positions = data.positions || {};
-  state.account = data.account || state.account;
-  state.settings = data.settings || {};
-  state.push = data.push || state.push;
-  state.realtime = data.realtime || state.realtime;
-
-  document.title = data.appName || 'Set & Forget';
-  els.tradeSizeInput.value = data.tradeSize || 100;
-  els.autoTradeToggle.checked = !!state.settings.autoTrade;
-  els.exitOnChopToggle.checked = state.settings.exitOnChop !== false;
-  els.minConfidenceInput.value = state.settings.minConfidence || 55;
-  els.lengthInput.value = state.settings.length || 20;
-  els.bullStayInput.value = state.settings.pStayBull || 0.8;
-  els.bearStayInput.value = state.settings.pStayBear || 0.8;
-  els.chopStayInput.value = state.settings.pStayChop || 0.6;
-  renderPairSelect();
-  renderSignal();
-  updateOverview();
-}
-
-async function fetchSignal(pairKey) {
-  const data = await api(`/api/signal?clientId=${encodeURIComponent(localClientId())}&pairKey=${encodeURIComponent(pairKey)}`);
-  state.latestMap[pairKey] = data.latest;
-  return data.latest;
-}
-
-async function refreshSelectedSignal() {
-  const pair = getSelectedPair();
-  await fetchSignal(pair.pairKey);
-  renderSignal();
-  updateOverview();
-}
-
-async function refreshWatchSignals() {
-  await Promise.all(state.watchlist.map(async item => {
-    const key = `${item.symbol}|${item.interval}`;
-    try {
-      await fetchSignal(key);
-    } catch (error) {
-      console.error(error);
-    }
-  }));
-  renderSignal();
-  updateOverview();
-}
-
-async function loadHistory() {
-  const pair = getSelectedPair();
-  const data = await api(`/api/history?clientId=${encodeURIComponent(localClientId())}&pairKey=${encodeURIComponent(pair.pairKey)}`);
-  state.history = data.history || [];
-  renderHistory();
-}
-
-async function savePrefs(payload = {}) {
-  const response = await api('/api/preferences', {
-    method: 'POST',
-    body: JSON.stringify({ clientId: localClientId(), ...payload }),
+function q(sel) { return document.querySelector(sel); }
+function fmt(n) {
+  return Number(n).toLocaleString(undefined, {
+    maximumFractionDigits: Math.abs(Number(n)) >= 1000 ? 2 : 4
   });
-  state.settings = response.settings || state.settings;
-  return response;
 }
-
-async function saveTradeSize() {
-  await savePrefs({ tradeSize: Number(els.tradeSizeInput.value || 100) });
-  showStatus('Trade size saved', 'success');
-}
-
-async function addWatch() {
-  const symbol = (els.watchSymbolInput.value || '').trim().toUpperCase();
-  const interval = els.watchIntervalInput.value || '15m';
-  if (!symbol) return;
-  const data = await api('/api/watchlist', {
-    method: 'POST',
-    body: JSON.stringify({ clientId: localClientId(), action: 'add', symbol, interval }),
-  });
-  state.watchlist = data.watchlist || state.watchlist;
-  state.selectedPairKey = data.selectedPairKey || state.selectedPairKey;
-  renderPairSelect();
-  els.watchSymbolInput.value = '';
-  await refreshWatchSignals();
-  await loadHistory();
-  subscribeRealtime();
-  showStatus(`${symbol} added to watchlist`, 'success');
-}
-
-async function removeWatch(pairKey) {
-  const data = await api('/api/watchlist', {
-    method: 'POST',
-    body: JSON.stringify({ clientId: localClientId(), action: 'remove', pairKey }),
-  });
-  state.watchlist = data.watchlist || state.watchlist;
-  state.selectedPairKey = data.selectedPairKey || state.selectedPairKey;
-  renderPairSelect();
-  await refreshWatchSignals();
-  await loadHistory();
-  subscribeRealtime();
-  showStatus('Pair removed', 'success');
-}
-
-async function selectPair(pairKey) {
-  state.selectedPairKey = pairKey;
-  els.pairSelect.value = pairKey;
-  await savePrefs({ selectedPairKey: pairKey });
-  await refreshSelectedSignal();
-  await loadHistory();
-  subscribeRealtime();
-}
-
-function activateTab(name) {
-  els.tabs.forEach(tab => tab.classList.toggle('is-active', tab.dataset.tab === name));
-  els.tabPanels.forEach(panel => panel.classList.toggle('active', panel.id === `tab-${name}`));
-}
-
-async function executeTrade(action) {
-  const pair = getSelectedPair();
-  const latest = state.latestMap[pair.pairKey];
-  if (!latest) {
-    showStatus('Load a signal first', 'error');
-    return;
-  }
-  const data = await api('/api/trades', {
-    method: 'POST',
-    body: JSON.stringify({
-      clientId: localClientId(),
-      symbol: pair.symbol,
-      interval: pair.interval,
-      action,
-      price: latest.price,
-      sizeQuote: Number(els.tradeSizeInput.value || 100),
-    }),
-  });
-  state.trades = data.trades || [];
-  state.positions = data.positions || {};
-  state.account = data.account || state.account;
-  updateOverview();
-  if (navigator.vibrate) navigator.vibrate(16);
-  showStatus(`${action} logged`, 'success');
-}
-
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = atob(base64);
-  const output = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i += 1) output[i] = raw.charCodeAt(i);
-  return output;
-}
-
-async function setupServiceWorker() {
-  if (!('serviceWorker' in navigator)) return;
+function save(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+function load(key, fallback) {
   try {
-    state.swRegistration = await navigator.serviceWorker.register('/service-worker.js');
-  } catch (error) {
-    console.error(error);
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
   }
 }
 
-async function enablePush() {
-  if (!state.push.configured) {
-    showStatus('Push not configured on the server yet', 'error', 3600);
-    return;
-  }
-  if (!state.swRegistration) await setupServiceWorker();
-  const permission = await Notification.requestPermission();
-  if (permission !== 'granted') {
-    showStatus('Notifications are blocked on this device', 'error', 3600);
-    return;
-  }
-  const existing = await state.swRegistration.pushManager.getSubscription();
-  const subscription = existing || await state.swRegistration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(state.push.publicKey),
-  });
-  await api('/api/push-subscribe', {
-    method: 'POST',
-    body: JSON.stringify({ clientId: localClientId(), subscription }),
-  });
-  els.pushBtn.textContent = 'Push enabled';
-  showStatus('Background push enabled', 'success');
-}
-
-async function saveSettings() {
-  await savePrefs({
-    tradeSize: Number(els.tradeSizeInput.value || 100),
-    settings: {
-      autoTrade: els.autoTradeToggle.checked,
-      exitOnChop: els.exitOnChopToggle.checked,
-      minConfidence: Number(els.minConfidenceInput.value || 55),
-      length: Number(els.lengthInput.value || 20),
-      pStayBull: Number(els.bullStayInput.value || 0.8),
-      pStayBear: Number(els.bearStayInput.value || 0.8),
-      pStayChop: Number(els.chopStayInput.value || 0.6),
-    },
-  });
-  await scanNow();
-  showStatus('Settings saved', 'success');
-}
-
-function clearRealtimeChannels() {
-  if (!state.ably || !state.realtimeChannels.length) return;
-  state.realtimeChannels.forEach(channel => {
-    try {
-      channel.unsubscribe();
-      state.ably.channels.release(channel.name);
-    } catch (error) {
-      console.error(error);
-    }
-  });
-  state.realtimeChannels = [];
-}
-
-async function setupRealtime() {
-  if (!state.realtime.enabled || !window.Ably || state.ably) return;
-  state.ably = new window.Ably.Realtime.Promise({
-    authUrl: `${state.realtime.authUrl}?clientId=${encodeURIComponent(localClientId())}`,
-    clientId: localClientId(),
-    autoConnect: true,
-  });
-  subscribeRealtime();
-}
-
-function subscribeRealtime() {
-  if (!state.ably) return;
-  clearRealtimeChannels();
-
-  const clientChannel = state.ably.channels.get(`client:${localClientId()}`);
-  clientChannel.subscribe('refresh', async () => {
-    try {
-      await loadAppState();
-      await loadHistory();
-      await refreshSelectedSignal();
-    } catch (error) {
-      console.error(error);
-    }
-  });
-  state.realtimeChannels.push(clientChannel);
-
-  const pair = getSelectedPair();
-  const pairChannel = state.ably.channels.get(`pair:${pair.pairKey}`);
-  pairChannel.subscribe('signal', async message => {
-    try {
-      if (message && message.data && message.data.latest) state.latestMap[pair.pairKey] = message.data.latest;
-      await refreshSelectedSignal();
-      await loadHistory();
-    } catch (error) {
-      console.error(error);
-    }
-  });
-  state.realtimeChannels.push(pairChannel);
-}
-
-async function scanNow() {
-  const data = await api(`/api/scan?clientId=${encodeURIComponent(localClientId())}`);
-  state.latestMap = { ...state.latestMap, ...(data.latestMap || {}) };
-  state.trades = data.trades || state.trades;
-  state.positions = data.positions || state.positions;
-  state.account = data.account || state.account;
-  renderSignal();
-  updateOverview();
-}
-
-async function refreshAll() {
-  await refreshWatchSignals();
-  await scanNow();
-  await loadHistory();
-}
-
-function bindEvents() {
-  els.settingsToggle.addEventListener('click', () => els.settingsPanel.classList.toggle('hidden'));
-  els.settingsClose.addEventListener('click', () => els.settingsPanel.classList.add('hidden'));
-  els.addWatchBtn.addEventListener('click', () => addWatch().catch(handleError));
-  els.pushBtn.addEventListener('click', () => enablePush().catch(handleError));
-  els.saveSettingsBtn.addEventListener('click', () => saveSettings().catch(handleError));
-  els.tradeSizeInput.addEventListener('change', () => saveTradeSize().catch(handleError));
-  els.pairSelect.addEventListener('change', () => selectPair(els.pairSelect.value).catch(handleError));
-  els.buyBtn.addEventListener('click', () => executeTrade('BUY').catch(handleError));
-  els.sellBtn.addEventListener('click', () => executeTrade('SELL').catch(handleError));
-  els.closeBtn.addEventListener('click', () => executeTrade('CLOSE').catch(handleError));
-  els.refreshBtn.addEventListener('click', () => refreshAll().catch(handleError));
-  els.tabs.forEach(tab => tab.addEventListener('click', () => activateTab(tab.dataset.tab)));
-
-  els.watchlistGrid.addEventListener('click', event => {
-    const button = event.target.closest('button[data-action]');
-    if (!button) return;
-    const action = button.dataset.action;
-    const key = button.dataset.key;
-    if (action === 'select') {
-      selectPair(key).then(() => activateTab('overview')).catch(handleError);
-    } else if (action === 'remove') {
-      removeWatch(key).catch(handleError);
-    }
-  });
-}
-
-function handleError(error) {
-  console.error(error);
-  showStatus(error.message || 'Something went wrong', 'error', 5000);
-}
-
-async function boot() {
-  bindEvents();
-  await setupServiceWorker();
-  await loadAppState();
-  await refreshWatchSignals();
-  await scanNow();
-  await loadHistory();
-  await setupRealtime();
-  activateTab('overview');
-
-  clearInterval(state.refreshTimer);
-  state.refreshTimer = setInterval(() => {
-    refreshAll().catch(console.error);
-  }, 20000);
-
-  const params = new URLSearchParams(window.location.search);
-  const pair = params.get('pair');
-  if (pair) await selectPair(pair);
-
-  showStatus('App ready', 'success');
-}
-
-boot().catch(handleError);
+boot();

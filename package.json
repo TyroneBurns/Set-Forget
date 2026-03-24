@@ -1,14 +1,9 @@
 {
-  "name": "set-and-forget-ably",
-  "version": "4.0.0",
+  "name": "set-and-forget",
+  "version": "3.2.0",
   "private": true,
-  "description": "Set & Forget trading signal app with Ably realtime, web push, watchlists, signal history, and paper auto trading.",
-  "scripts": {
-    "dev": "vercel dev",
-    "start": "vercel dev"
-  },
+  "description": "Set & Forget with candle HMM, Ably realtime, signal quality scoring, and adaptive thresholds",
   "dependencies": {
-    "ably": "^2.13.0",
-    "web-push": "^3.6.7"
+    "ably": "^2.8.0"
   }
 }
