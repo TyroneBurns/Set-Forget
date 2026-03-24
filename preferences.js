@@ -2,6 +2,7 @@ const { getClientState, updateClientState } = require('./_lib/state');
 const { allowMethods, readJson, send } = require('./_lib/http');
 const { pairKey, clamp } = require('./_lib/hmm');
 const { normalizeSymbol } = require('./_lib/market');
+const { publish } = require('./_lib/ably');
 
 module.exports = async (req, res) => {
   allowMethods(res, ['GET', 'POST', 'OPTIONS']);
@@ -49,6 +50,12 @@ module.exports = async (req, res) => {
     }
     return client;
   });
+
+  try {
+    await publish(`client:${safeClientId}`, 'refresh', { reason: 'preferences' });
+  } catch (error) {
+    console.error(error);
+  }
 
   return send(res, 200, {
     ok: true,

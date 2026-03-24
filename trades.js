@@ -3,6 +3,7 @@ const { getClientState, updateClientState } = require('./_lib/state');
 const { normalizeSymbol } = require('./_lib/market');
 const { openOrFlipPosition, closePosition, snapshotPosition } = require('./_lib/trading');
 const { pairKey } = require('./_lib/hmm');
+const { publish } = require('./_lib/ably');
 
 module.exports = async (req, res) => {
   allowMethods(res, ['GET', 'POST', 'OPTIONS']);
@@ -64,6 +65,14 @@ module.exports = async (req, res) => {
   });
 
   const positions = Object.fromEntries(Object.entries(updated.positions || {}).map(([entryKey, value]) => [entryKey, snapshotPosition(value)]));
+
+  try {
+    await publish(`client:${safeClientId}`, 'refresh', { reason: 'trade' });
+    await publish(`pair:${key}`, 'signal', { reason: 'trade', pairKey: key });
+  } catch (error) {
+    console.error(error);
+  }
+
   return send(res, 200, {
     ok: true,
     trades: updated.trades || [],

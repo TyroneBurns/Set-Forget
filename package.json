@@ -1,14 +1,14 @@
 {
-  "name": "set-and-forget-supabase",
-  "version": "3.0.0",
+  "name": "set-and-forget-ably",
+  "version": "4.0.0",
   "private": true,
-  "description": "Set & Forget trading signal app with Supabase realtime, web push, watchlists, signal history, and paper auto trading.",
+  "description": "Set & Forget trading signal app with Ably realtime, web push, watchlists, signal history, and paper auto trading.",
   "scripts": {
     "dev": "vercel dev",
     "start": "vercel dev"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.56.0",
+    "ably": "^2.13.0",
     "web-push": "^3.6.7"
   }
 }

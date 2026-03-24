@@ -13,8 +13,8 @@ const state = {
   push: { configured: false, publicKey: null },
   signalTimer: null,
   swRegistration: null,
-  realtime: { enabled: false, url: null, anonKey: null },
-  supabase: null,
+  realtime: { enabled: false, authUrl: null },
+  ably: null,
   realtimeChannels: [],
 };
 
@@ -464,60 +464,51 @@ async function saveSettings() {
 
 
 function clearRealtimeChannels() {
-  if (!state.supabase || !state.realtimeChannels.length) return;
+  if (!state.ably || !state.realtimeChannels.length) return;
   state.realtimeChannels.forEach(channel => {
-    try { state.supabase.removeChannel(channel); } catch (error) { console.error(error); }
+    try { channel.unsubscribe(); state.ably.channels.release(channel.name); } catch (error) { console.error(error); }
   });
   state.realtimeChannels = [];
 }
 
-function setupRealtime() {
-  if (!state.realtime.enabled || !window.supabase || state.supabase) return;
-  state.supabase = window.supabase.createClient(state.realtime.url, state.realtime.anonKey);
+async function setupRealtime() {
+  if (!state.realtime.enabled || !window.Ably || state.ably) return;
+  state.ably = new window.Ably.Realtime.Promise({
+    authUrl: `${state.realtime.authUrl}?clientId=${encodeURIComponent(localClientId())}`,
+    clientId: localClientId(),
+    autoConnect: true,
+  });
   subscribeRealtime();
 }
 
 function subscribeRealtime() {
-  if (!state.supabase) return;
+  if (!state.ably) return;
   clearRealtimeChannels();
 
-  const clientChannel = state.supabase
-    .channel(`client-${localClientId()}`)
-    .on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'saf_clients',
-      filter: `client_id=eq.${localClientId()}`,
-    }, async () => {
-      try {
-        await loadAppState();
-      } catch (error) {
-        console.error(error);
-      }
-    })
-    .subscribe();
-
+  const clientChannel = state.ably.channels.get(`client:${localClientId()}`);
+  clientChannel.subscribe('refresh', async () => {
+    try {
+      await loadAppState();
+    } catch (error) {
+      console.error(error);
+    }
+  });
   state.realtimeChannels.push(clientChannel);
 
   const pair = getSelectedPair();
-  const historyChannel = state.supabase
-    .channel(`history-${pair.pairKey}`)
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'saf_signal_history',
-      filter: `pair_key=eq.${pair.pairKey}`,
-    }, async () => {
-      try {
-        await loadHistory();
-        await refreshSelectedSignal();
-      } catch (error) {
-        console.error(error);
+  const pairChannel = state.ably.channels.get(`pair:${pair.pairKey}`);
+  pairChannel.subscribe('signal', async message => {
+    try {
+      if (message && message.data && message.data.latest) {
+        state.latestMap[pair.pairKey] = message.data.latest;
       }
-    })
-    .subscribe();
-
-  state.realtimeChannels.push(historyChannel);
+      await loadHistory();
+      await refreshSelectedSignal();
+    } catch (error) {
+      console.error(error);
+    }
+  });
+  state.realtimeChannels.push(pairChannel);
 }
 
 async function scanNow() {

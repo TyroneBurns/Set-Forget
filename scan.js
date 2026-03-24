@@ -4,6 +4,7 @@ const { fetchCandles } = require('./_lib/market');
 const { analyseCandles, pairKey } = require('./_lib/hmm');
 const { sendPush } = require('./_lib/push');
 const { applyAutoSignal } = require('./_lib/trading');
+const { publish } = require('./_lib/ably');
 
 module.exports = async (req, res) => {
   allowMethods(res, ['GET', 'OPTIONS']);
@@ -58,6 +59,15 @@ module.exports = async (req, res) => {
       };
 
       await appendHistory(key, historyEntry, 400);
+
+      if (changed) {
+        try {
+          await publish(`pair:${key}`, 'signal', { latest, historyEntry });
+          await publish(`client:${clientId}`, 'refresh', { reason: 'signal', pairKey: key, signal: latest.signal });
+        } catch (error) {
+          console.error(error);
+        }
+      }
 
       if (client.settings.autoTrade) {
         const autoEvents = applyAutoSignal(client, item, latest.signal, latest.price);
