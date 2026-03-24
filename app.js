@@ -11,9 +11,9 @@ const state = {
   account: { startingBalance: 10000, realizedPnl: 0 },
   settings: {},
   push: { configured: false, publicKey: null },
-  signalTimer: null,
-  swRegistration: null,
   realtime: { enabled: false, authUrl: null },
+  swRegistration: null,
+  refreshTimer: null,
   ably: null,
   realtimeChannels: [],
 };
@@ -58,7 +58,22 @@ const els = {
   tradeList: document.getElementById('tradeList'),
   tabs: Array.from(document.querySelectorAll('.tab')),
   tabPanels: Array.from(document.querySelectorAll('.tab-panel')),
+  statusBar: document.getElementById('statusBar'),
 };
+
+function showStatus(message, tone = 'info', persistMs = 2600) {
+  if (!message) {
+    els.statusBar.textContent = '';
+    els.statusBar.className = 'status-bar hidden';
+    return;
+  }
+  els.statusBar.textContent = message;
+  els.statusBar.className = `status-bar ${tone === 'error' ? 'error' : tone === 'success' ? 'success' : ''}`.trim();
+  if (persistMs > 0) {
+    clearTimeout(showStatus._timer);
+    showStatus._timer = setTimeout(() => showStatus(''), persistMs);
+  }
+}
 
 function fmtNumber(value, digits = 2) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '-';
@@ -76,35 +91,10 @@ function fmtPrice(value) {
   return fmtNumber(num, 2);
 }
 
-function fmtPct(value) {
-  return `${fmtNumber(value, 2)}%`;
-}
-
+function fmtPct(value) { return `${fmtNumber(value, 2)}%`; }
 function fmtDate(value) {
   const date = new Date(value);
   return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-}
-
-function getSelectedPair() {
-  const value = state.selectedPairKey || els.pairSelect.value || 'BTCUSDT|15m';
-  const [symbol, interval] = value.split('|');
-  return { symbol, interval, pairKey: value };
-}
-
-async function api(url, options = {}) {
-  const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-    ...options,
-  });
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data.error || `Request failed: ${response.status}`);
-  }
-  return data;
 }
 
 function localClientId() {
@@ -115,42 +105,33 @@ function localClientId() {
   return state.clientId;
 }
 
-async function loadAppState() {
-  const data = await api(`/api/state?clientId=${encodeURIComponent(localClientId())}`);
-  state.clientId = data.clientId;
-  localStorage.setItem('saf-client-id', state.clientId);
-  state.appName = data.appName;
-  state.watchlist = data.watchlist || [];
-  state.selectedPairKey = data.selectedPairKey;
-  state.trades = data.trades || [];
-  state.positions = data.positions || {};
-  state.account = data.account || state.account;
-  state.settings = data.settings || {};
-  state.push = data.push || state.push;
-  state.realtime = data.realtime || state.realtime;
+function getSelectedPair() {
+  const fallback = state.selectedPairKey || els.pairSelect.value || 'BTCUSDT|15m';
+  const [symbol, interval] = fallback.split('|');
+  return { symbol, interval, pairKey: fallback };
+}
 
-  document.title = data.appName || 'Set & Forget';
-  els.tradeSizeInput.value = data.tradeSize || 100;
-  els.autoTradeToggle.checked = !!state.settings.autoTrade;
-  els.exitOnChopToggle.checked = state.settings.exitOnChop !== false;
-  els.minConfidenceInput.value = state.settings.minConfidence || 55;
-  els.lengthInput.value = state.settings.length || 20;
-  els.bullStayInput.value = state.settings.pStayBull || 0.8;
-  els.bearStayInput.value = state.settings.pStayBear || 0.8;
-  els.chopStayInput.value = state.settings.pStayChop || 0.6;
-  renderPairSelect();
-  await Promise.all([refreshSelectedSignal(), loadHistory(), renderTrades()]);
-  setupRealtime();
-  updateOverview();
+async function api(url, options = {}) {
+  const response = await fetch(url, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    },
+    ...options,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `Request failed: ${response.status}`);
+  return data;
 }
 
 function renderPairSelect() {
   els.pairSelect.innerHTML = '';
   state.watchlist.forEach(item => {
+    const key = `${item.symbol}|${item.interval}`;
     const option = document.createElement('option');
-    option.value = `${item.symbol}|${item.interval}`;
+    option.value = key;
     option.textContent = `${item.symbol} · ${item.interval}`;
-    if (option.value === state.selectedPairKey) option.selected = true;
+    option.selected = key === state.selectedPairKey;
     els.pairSelect.appendChild(option);
   });
 }
@@ -169,6 +150,7 @@ function renderSignal() {
     els.bullPct.textContent = '0%';
     els.bearPct.textContent = '0%';
     els.chopPct.textContent = '0%';
+    els.confidenceText.textContent = '-';
     return;
   }
 
@@ -177,12 +159,83 @@ function renderSignal() {
   els.signalBadge.className = `signal-badge ${tone}`;
   els.lastPriceText.textContent = fmtPrice(latest.price);
   els.regimeText.textContent = `${latest.regime} · ${fmtPct(latest.confidence)} confidence`;
-  els.updatedText.textContent = `Updated ${fmtDate(latest.time || Date.now())}`;
+  els.updatedText.textContent = `Updated ${fmtDate(latest.time || latest.ts || Date.now())}`;
   els.bullPct.textContent = fmtPct(latest.bull);
   els.bearPct.textContent = fmtPct(latest.bear);
   els.chopPct.textContent = fmtPct(latest.chop);
   els.confidenceText.textContent = fmtPct(latest.confidence);
   state.selectedSignal = latest.signal;
+}
+
+function renderWatchlist() {
+  els.watchlistGrid.innerHTML = '';
+  state.watchlist.forEach(item => {
+    const key = `${item.symbol}|${item.interval}`;
+    const latest = state.latestMap[key];
+    const selected = key === state.selectedPairKey;
+    const el = document.createElement('article');
+    el.className = `watch-item ${selected ? 'selected' : ''}`;
+    const tone = latest ? latest.signal : 'FLAT';
+    el.innerHTML = `
+      <div class="watch-head">
+        <div>
+          <strong>${item.symbol}</strong>
+          <div class="small-meta">${item.interval}</div>
+        </div>
+        <span class="feed-pill">${tone}</span>
+      </div>
+      <p class="feed-copy">${latest ? `${latest.regime} · ${fmtPct(latest.confidence)} · ${fmtPrice(latest.price)}` : 'No live read yet'}</p>
+      <div class="watch-actions">
+        <button class="inline-btn" data-action="select" data-key="${key}">Open</button>
+        <button class="inline-btn" data-action="remove" data-key="${key}">Remove</button>
+      </div>
+    `;
+    els.watchlistGrid.appendChild(el);
+  });
+}
+
+function renderHistory() {
+  els.historyList.innerHTML = '';
+  if (!state.history.length) {
+    els.historyList.innerHTML = `<article class="feed-item"><p class="feed-copy">No saved signal flips yet.</p></article>`;
+    return;
+  }
+  state.history.forEach(item => {
+    const el = document.createElement('article');
+    el.className = 'feed-item';
+    el.innerHTML = `
+      <div class="feed-top">
+        <strong>${item.symbol} · ${item.interval}</strong>
+        <span class="feed-pill">${item.signal}</span>
+      </div>
+      <p class="feed-copy"><strong>${item.regime}</strong> at ${fmtPrice(item.price)} · ${fmtPct(item.confidence)} confidence</p>
+      <p class="small-meta">${fmtDate(item.ts || item.time || Date.now())}</p>
+    `;
+    els.historyList.appendChild(el);
+  });
+}
+
+function renderTrades() {
+  els.tradeList.innerHTML = '';
+  if (!state.trades.length) {
+    els.tradeList.innerHTML = `<article class="feed-item"><p class="feed-copy">No trades yet. Manual and auto trades will land here.</p></article>`;
+    return;
+  }
+  state.trades.forEach(item => {
+    const pnl = Number(item.realizedPnl || 0);
+    const pnlText = pnl ? ` · PnL ${fmtNumber(pnl, 2)}` : '';
+    const el = document.createElement('article');
+    el.className = 'feed-item';
+    el.innerHTML = `
+      <div class="feed-top">
+        <strong>${item.action} · ${item.symbol} ${item.interval}</strong>
+        <span class="feed-pill">${item.mode}</span>
+      </div>
+      <p class="feed-copy">${item.side || ''} at <strong>${fmtPrice(item.price)}</strong> · size <strong>${fmtNumber(item.sizeQuote, 2)}</strong>${pnlText}</p>
+      <p class="small-meta">${fmtDate(item.ts)}</p>
+    `;
+    els.tradeList.appendChild(el);
+  });
 }
 
 function updateOverview() {
@@ -210,82 +263,43 @@ function updateOverview() {
   renderTrades();
 }
 
-function renderWatchlist() {
-  els.watchlistGrid.innerHTML = '';
-  state.watchlist.forEach(item => {
-    const key = `${item.symbol}|${item.interval}`;
-    const latest = state.latestMap[key];
-    const selected = key === state.selectedPairKey;
-    const el = document.createElement('article');
-    el.className = `watch-item ${selected ? 'selected' : ''}`;
-    const tone = latest ? (latest.signal === 'LONG' ? 'LONG' : latest.signal === 'SHORT' ? 'SHORT' : 'FLAT') : 'FLAT';
-    el.innerHTML = `
-      <div class="watch-head">
-        <div>
-          <strong>${item.symbol}</strong>
-          <div class="small-meta">${item.interval}</div>
-        </div>
-        <span class="feed-pill">${tone}</span>
-      </div>
-      <p class="feed-copy">${latest ? `${latest.regime} · ${fmtPct(latest.confidence)} · ${fmtPrice(latest.price)}` : 'No live read yet'}</p>
-      <div class="watch-actions">
-        <button class="inline-btn" data-action="select" data-key="${key}">Open</button>
-        <button class="inline-btn" data-action="remove" data-key="${key}">Remove</button>
-      </div>
-    `;
-    els.watchlistGrid.appendChild(el);
-  });
+async function loadAppState() {
+  const data = await api(`/api/state?clientId=${encodeURIComponent(localClientId())}`);
+  state.clientId = data.clientId;
+  localStorage.setItem('saf-client-id', data.clientId);
+  state.appName = data.appName || 'Set & Forget';
+  state.watchlist = data.watchlist || [];
+  state.selectedPairKey = data.selectedPairKey || (state.watchlist[0] ? `${state.watchlist[0].symbol}|${state.watchlist[0].interval}` : 'BTCUSDT|15m');
+  state.trades = data.trades || [];
+  state.positions = data.positions || {};
+  state.account = data.account || state.account;
+  state.settings = data.settings || {};
+  state.push = data.push || state.push;
+  state.realtime = data.realtime || state.realtime;
+
+  document.title = data.appName || 'Set & Forget';
+  els.tradeSizeInput.value = data.tradeSize || 100;
+  els.autoTradeToggle.checked = !!state.settings.autoTrade;
+  els.exitOnChopToggle.checked = state.settings.exitOnChop !== false;
+  els.minConfidenceInput.value = state.settings.minConfidence || 55;
+  els.lengthInput.value = state.settings.length || 20;
+  els.bullStayInput.value = state.settings.pStayBull || 0.8;
+  els.bearStayInput.value = state.settings.pStayBear || 0.8;
+  els.chopStayInput.value = state.settings.pStayChop || 0.6;
+  renderPairSelect();
+  renderSignal();
+  updateOverview();
 }
 
-function renderHistory() {
-  els.historyList.innerHTML = '';
-  if (!state.history.length) {
-    els.historyList.innerHTML = `<article class="feed-item"><p class="feed-copy">No saved signal flips yet. Once the background scanner detects a change, it will appear here.</p></article>`;
-    return;
-  }
-  state.history.forEach(item => {
-    const tone = item.signal === 'LONG' ? 'LONG' : item.signal === 'SHORT' ? 'SHORT' : 'FLAT';
-    const el = document.createElement('article');
-    el.className = 'feed-item';
-    el.innerHTML = `
-      <div class="feed-top">
-        <strong>${item.symbol} · ${item.interval}</strong>
-        <span class="feed-pill">${tone}</span>
-      </div>
-      <p class="feed-copy"><strong>${item.regime}</strong> at ${fmtPrice(item.price)} · ${fmtPct(item.confidence)} confidence</p>
-      <p class="small-meta">${fmtDate(item.ts)}</p>
-    `;
-    els.historyList.appendChild(el);
-  });
-}
-
-function renderTrades() {
-  els.tradeList.innerHTML = '';
-  if (!state.trades.length) {
-    els.tradeList.innerHTML = `<article class="feed-item"><p class="feed-copy">No trades yet. Manual and auto trades will both land here.</p></article>`;
-    return;
-  }
-  state.trades.forEach(item => {
-    const el = document.createElement('article');
-    el.className = 'feed-item';
-    const pnl = Number(item.realizedPnl || 0);
-    const pnlText = pnl ? ` · PnL ${fmtNumber(pnl, 2)}` : '';
-    el.innerHTML = `
-      <div class="feed-top">
-        <strong>${item.action} · ${item.symbol} ${item.interval}</strong>
-        <span class="feed-pill">${item.mode}</span>
-      </div>
-      <p class="feed-copy">${item.side || ''} at <strong>${fmtPrice(item.price)}</strong> · size <strong>${fmtNumber(item.sizeQuote, 2)}</strong>${pnlText}</p>
-      <p class="small-meta">${fmtDate(item.ts)}</p>
-    `;
-    els.tradeList.appendChild(el);
-  });
+async function fetchSignal(pairKey) {
+  const data = await api(`/api/signal?clientId=${encodeURIComponent(localClientId())}&pairKey=${encodeURIComponent(pairKey)}`);
+  state.latestMap[pairKey] = data.latest;
+  return data.latest;
 }
 
 async function refreshSelectedSignal() {
   const pair = getSelectedPair();
-  const data = await api(`/api/signal?clientId=${encodeURIComponent(localClientId())}&pairKey=${encodeURIComponent(pair.pairKey)}`);
-  state.latestMap[pair.pairKey] = data.latest;
+  await fetchSignal(pair.pairKey);
   renderSignal();
   updateOverview();
 }
@@ -294,8 +308,7 @@ async function refreshWatchSignals() {
   await Promise.all(state.watchlist.map(async item => {
     const key = `${item.symbol}|${item.interval}`;
     try {
-      const data = await api(`/api/signal?clientId=${encodeURIComponent(localClientId())}&pairKey=${encodeURIComponent(key)}`);
-      state.latestMap[key] = data.latest;
+      await fetchSignal(key);
     } catch (error) {
       console.error(error);
     }
@@ -314,10 +327,7 @@ async function loadHistory() {
 async function savePrefs(payload = {}) {
   const response = await api('/api/preferences', {
     method: 'POST',
-    body: JSON.stringify({
-      clientId: localClientId(),
-      ...payload,
-    }),
+    body: JSON.stringify({ clientId: localClientId(), ...payload }),
   });
   state.settings = response.settings || state.settings;
   return response;
@@ -325,6 +335,7 @@ async function savePrefs(payload = {}) {
 
 async function saveTradeSize() {
   await savePrefs({ tradeSize: Number(els.tradeSizeInput.value || 100) });
+  showStatus('Trade size saved', 'success');
 }
 
 async function addWatch() {
@@ -333,42 +344,36 @@ async function addWatch() {
   if (!symbol) return;
   const data = await api('/api/watchlist', {
     method: 'POST',
-    body: JSON.stringify({
-      clientId: localClientId(),
-      action: 'add',
-      symbol,
-      interval,
-    }),
+    body: JSON.stringify({ clientId: localClientId(), action: 'add', symbol, interval }),
   });
   state.watchlist = data.watchlist || state.watchlist;
   state.selectedPairKey = data.selectedPairKey || state.selectedPairKey;
-  els.watchSymbolInput.value = '';
   renderPairSelect();
+  els.watchSymbolInput.value = '';
   await refreshWatchSignals();
   await loadHistory();
+  subscribeRealtime();
+  showStatus(`${symbol} added to watchlist`, 'success');
 }
 
 async function removeWatch(pairKey) {
   const data = await api('/api/watchlist', {
     method: 'POST',
-    body: JSON.stringify({
-      clientId: localClientId(),
-      action: 'remove',
-      pairKey,
-    }),
+    body: JSON.stringify({ clientId: localClientId(), action: 'remove', pairKey }),
   });
   state.watchlist = data.watchlist || state.watchlist;
   state.selectedPairKey = data.selectedPairKey || state.selectedPairKey;
   renderPairSelect();
   await refreshWatchSignals();
   await loadHistory();
+  subscribeRealtime();
+  showStatus('Pair removed', 'success');
 }
 
 async function selectPair(pairKey) {
   state.selectedPairKey = pairKey;
   els.pairSelect.value = pairKey;
   await savePrefs({ selectedPairKey: pairKey });
-  renderSignal();
   await refreshSelectedSignal();
   await loadHistory();
   subscribeRealtime();
@@ -382,7 +387,10 @@ function activateTab(name) {
 async function executeTrade(action) {
   const pair = getSelectedPair();
   const latest = state.latestMap[pair.pairKey];
-  if (!latest) return;
+  if (!latest) {
+    showStatus('Load a signal first', 'error');
+    return;
+  }
   const data = await api('/api/trades', {
     method: 'POST',
     body: JSON.stringify({
@@ -398,7 +406,8 @@ async function executeTrade(action) {
   state.positions = data.positions || {};
   state.account = data.account || state.account;
   updateOverview();
-  if (navigator.vibrate) navigator.vibrate(18);
+  if (navigator.vibrate) navigator.vibrate(16);
+  showStatus(`${action} logged`, 'success');
 }
 
 function urlBase64ToUint8Array(base64String) {
@@ -406,26 +415,28 @@ function urlBase64ToUint8Array(base64String) {
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const raw = atob(base64);
   const output = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; ++i) output[i] = raw.charCodeAt(i);
+  for (let i = 0; i < raw.length; i += 1) output[i] = raw.charCodeAt(i);
   return output;
 }
 
 async function setupServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
-  state.swRegistration = await navigator.serviceWorker.register('/service-worker.js');
+  try {
+    state.swRegistration = await navigator.serviceWorker.register('/service-worker.js');
+  } catch (error) {
+    console.error(error);
+  }
 }
 
 async function enablePush() {
   if (!state.push.configured) {
-    alert('Push env vars are not set on the server yet. Add the VAPID keys and redeploy.');
+    showStatus('Push not configured on the server yet', 'error', 3600);
     return;
   }
-  if (!state.swRegistration) {
-    await setupServiceWorker();
-  }
+  if (!state.swRegistration) await setupServiceWorker();
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') {
-    alert('Notifications are blocked on this device.');
+    showStatus('Notifications are blocked on this device', 'error', 3600);
     return;
   }
   const existing = await state.swRegistration.pushManager.getSubscription();
@@ -433,16 +444,12 @@ async function enablePush() {
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(state.push.publicKey),
   });
-
   await api('/api/push-subscribe', {
     method: 'POST',
-    body: JSON.stringify({
-      clientId: localClientId(),
-      subscription,
-    }),
+    body: JSON.stringify({ clientId: localClientId(), subscription }),
   });
-
-  els.pushBtn.textContent = 'Background push enabled';
+  els.pushBtn.textContent = 'Push enabled';
+  showStatus('Background push enabled', 'success');
 }
 
 async function saveSettings() {
@@ -458,15 +465,19 @@ async function saveSettings() {
       pStayChop: Number(els.chopStayInput.value || 0.6),
     },
   });
-  await refreshWatchSignals();
-  alert('Saved');
+  await scanNow();
+  showStatus('Settings saved', 'success');
 }
-
 
 function clearRealtimeChannels() {
   if (!state.ably || !state.realtimeChannels.length) return;
   state.realtimeChannels.forEach(channel => {
-    try { channel.unsubscribe(); state.ably.channels.release(channel.name); } catch (error) { console.error(error); }
+    try {
+      channel.unsubscribe();
+      state.ably.channels.release(channel.name);
+    } catch (error) {
+      console.error(error);
+    }
   });
   state.realtimeChannels = [];
 }
@@ -489,6 +500,8 @@ function subscribeRealtime() {
   clientChannel.subscribe('refresh', async () => {
     try {
       await loadAppState();
+      await loadHistory();
+      await refreshSelectedSignal();
     } catch (error) {
       console.error(error);
     }
@@ -499,11 +512,9 @@ function subscribeRealtime() {
   const pairChannel = state.ably.channels.get(`pair:${pair.pairKey}`);
   pairChannel.subscribe('signal', async message => {
     try {
-      if (message && message.data && message.data.latest) {
-        state.latestMap[pair.pairKey] = message.data.latest;
-      }
-      await loadHistory();
+      if (message && message.data && message.data.latest) state.latestMap[pair.pairKey] = message.data.latest;
       await refreshSelectedSignal();
+      await loadHistory();
     } catch (error) {
       console.error(error);
     }
@@ -512,53 +523,51 @@ function subscribeRealtime() {
 }
 
 async function scanNow() {
-  try {
-    const data = await api(`/api/scan?clientId=${encodeURIComponent(localClientId())}`);
-    state.latestMap = { ...state.latestMap, ...(data.latestMap || {}) };
-    state.trades = data.trades || state.trades;
-    state.positions = data.positions || state.positions;
-    state.account = data.account || state.account;
-    renderSignal();
-    updateOverview();
-  } catch (error) {
-    console.error(error);
-  }
+  const data = await api(`/api/scan?clientId=${encodeURIComponent(localClientId())}`);
+  state.latestMap = { ...state.latestMap, ...(data.latestMap || {}) };
+  state.trades = data.trades || state.trades;
+  state.positions = data.positions || state.positions;
+  state.account = data.account || state.account;
+  renderSignal();
+  updateOverview();
+}
+
+async function refreshAll() {
+  await refreshWatchSignals();
+  await scanNow();
+  await loadHistory();
 }
 
 function bindEvents() {
   els.settingsToggle.addEventListener('click', () => els.settingsPanel.classList.toggle('hidden'));
   els.settingsClose.addEventListener('click', () => els.settingsPanel.classList.add('hidden'));
-  els.addWatchBtn.addEventListener('click', addWatch);
-  els.pushBtn.addEventListener('click', enablePush);
-  els.saveSettingsBtn.addEventListener('click', saveSettings);
-  els.tradeSizeInput.addEventListener('change', saveTradeSize);
-  els.pairSelect.addEventListener('change', async () => {
-    await selectPair(els.pairSelect.value);
-  });
-  els.buyBtn.addEventListener('click', () => executeTrade('BUY'));
-  els.sellBtn.addEventListener('click', () => executeTrade('SELL'));
-  els.closeBtn.addEventListener('click', () => executeTrade('CLOSE'));
-  els.refreshBtn.addEventListener('click', async () => {
-    await refreshWatchSignals();
-    await loadHistory();
-  });
+  els.addWatchBtn.addEventListener('click', () => addWatch().catch(handleError));
+  els.pushBtn.addEventListener('click', () => enablePush().catch(handleError));
+  els.saveSettingsBtn.addEventListener('click', () => saveSettings().catch(handleError));
+  els.tradeSizeInput.addEventListener('change', () => saveTradeSize().catch(handleError));
+  els.pairSelect.addEventListener('change', () => selectPair(els.pairSelect.value).catch(handleError));
+  els.buyBtn.addEventListener('click', () => executeTrade('BUY').catch(handleError));
+  els.sellBtn.addEventListener('click', () => executeTrade('SELL').catch(handleError));
+  els.closeBtn.addEventListener('click', () => executeTrade('CLOSE').catch(handleError));
+  els.refreshBtn.addEventListener('click', () => refreshAll().catch(handleError));
+  els.tabs.forEach(tab => tab.addEventListener('click', () => activateTab(tab.dataset.tab)));
 
-  els.tabs.forEach(tab => {
-    tab.addEventListener('click', () => activateTab(tab.dataset.tab));
-  });
-
-  els.watchlistGrid.addEventListener('click', async event => {
+  els.watchlistGrid.addEventListener('click', event => {
     const button = event.target.closest('button[data-action]');
     if (!button) return;
     const action = button.dataset.action;
     const key = button.dataset.key;
     if (action === 'select') {
-      await selectPair(key);
-      activateTab('overview');
+      selectPair(key).then(() => activateTab('overview')).catch(handleError);
     } else if (action === 'remove') {
-      await removeWatch(key);
+      removeWatch(key).catch(handleError);
     }
   });
+}
+
+function handleError(error) {
+  console.error(error);
+  showStatus(error.message || 'Something went wrong', 'error', 5000);
 }
 
 async function boot() {
@@ -567,27 +576,20 @@ async function boot() {
   await loadAppState();
   await refreshWatchSignals();
   await scanNow();
+  await loadHistory();
+  await setupRealtime();
   activateTab('overview');
 
-  clearInterval(state.signalTimer);
-  state.signalTimer = setInterval(async () => {
-    try {
-      await scanNow();
-      await refreshWatchSignals();
-      await loadHistory();
-    } catch (error) {
-      console.error(error);
-    }
-  }, 15000);
+  clearInterval(state.refreshTimer);
+  state.refreshTimer = setInterval(() => {
+    refreshAll().catch(console.error);
+  }, 20000);
 
   const params = new URLSearchParams(window.location.search);
   const pair = params.get('pair');
-  if (pair) {
-    selectPair(pair).catch(console.error);
-  }
+  if (pair) await selectPair(pair);
+
+  showStatus('App ready', 'success');
 }
 
-boot().catch(error => {
-  console.error(error);
-  alert(error.message);
-});
+boot().catch(handleError);
