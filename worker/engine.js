@@ -2,20 +2,65 @@ import { query } from '../lib/db.js';
 import { runHmmRegime, enrichSignal } from '../lib/signal-engine.js';
 
 const PORTFOLIO_ID = 'main';
-const DEFAULT_PAIRS = (process.env.DEFAULT_PAIRS || 'BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT').split(',').map(s => s.trim()).filter(Boolean);
+const DEFAULT_PAIRS = (process.env.DEFAULT_PAIRS || 'BTCUSDT,ETHUSDT,SOLUSDT').split(',').map(s => s.trim()).filter(Boolean);
 const TIMEFRAME = process.env.DEFAULT_TIMEFRAME || '15m';
 const STARTING_BANKROLL = Number(process.env.STARTING_BANKROLL_GBP || 1000);
 const RISK_PER_TRADE = Number(process.env.RISK_PER_TRADE_PCT || 25);
 const BASE_CONFIDENCE = Number(process.env.BASE_CONFIDENCE || 65);
 const TEST_WINDOW_DAYS = Number(process.env.TEST_WINDOW_DAYS || 7);
 
+async function fetchJsonWithTimeout(url, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'accept': 'application/json',
+        'user-agent': 'set-and-forget/5.1'
+      }
+    });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchKlines(symbol, interval = TIMEFRAME, limit = 250) {
-  const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
-  if (!res.ok) throw new Error(`Klines failed for ${symbol}`);
-  const rows = await res.json();
-  return rows.map((k) => ({
-    openTime: k[0], open: Number(k[1]), high: Number(k[2]), low: Number(k[3]), close: Number(k[4]), volume: Number(k[5]), closeTime: k[6]
-  }));
+  const urls = [
+    `https://data-api.binance.vision/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
+    `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
+  ];
+
+  let lastError = 'unknown error';
+
+  for (const url of urls) {
+    try {
+      const res = await fetchJsonWithTimeout(url, 15000);
+      if (!res.ok) {
+        lastError = `HTTP ${res.status} from ${new URL(url).host}`;
+        continue;
+      }
+      const rows = await res.json();
+      if (!Array.isArray(rows) || rows.length === 0) {
+        lastError = `Empty data from ${new URL(url).host}`;
+        continue;
+      }
+      return rows.map((k) => ({
+        openTime: k[0],
+        open: Number(k[1]),
+        high: Number(k[2]),
+        low: Number(k[3]),
+        close: Number(k[4]),
+        volume: Number(k[5]),
+        closeTime: k[6]
+      }));
+    } catch (err) {
+      lastError = `${new URL(url).host}: ${err.message}`;
+    }
+  }
+
+  throw new Error(`Klines failed for ${symbol}: ${lastError}`);
 }
 
 async function ensurePortfolio() {
@@ -105,11 +150,7 @@ async function closePosition(pos, exitPrice, portfolio) {
   const newCash = Number(portfolio.cash_gbp) + Number(pos.notional_gbp) + pnl;
   const newRealised = Number(portfolio.realised_pnl_gbp) + pnl;
 
-  await query(`
-    update sf_positions
-    set status = 'closed', closed_at = now()
-    where id = $1
-  `, [pos.id]);
+  await query(`update sf_positions set status = 'closed', closed_at = now() where id = $1`, [pos.id]);
 
   await query(`
     insert into sf_trades (
@@ -125,7 +166,7 @@ async function closePosition(pos, exitPrice, portfolio) {
 }
 
 async function openPosition(pair, side, price, portfolio) {
-  const equity = Number(portfolio.cash_gbp) + 0;
+  const equity = Number(portfolio.cash_gbp);
   const notional = +(equity * (Number(portfolio.risk_per_trade_pct) / 100)).toFixed(2);
   if (notional <= 0 || Number(portfolio.cash_gbp) < notional) return;
 
@@ -144,24 +185,17 @@ async function openPosition(pair, side, price, portfolio) {
     ) values ($1,$2,$3,$4,$5,$6,'OPEN','auto', now())
   `, [PORTFOLIO_ID, pair, side, units, notional, price]);
 
-  await query(`
-    update sf_portfolio
-    set cash_gbp = $2, updated_at = now()
-    where id = $1
-  `, [PORTFOLIO_ID, newCash]);
+  await query(`update sf_portfolio set cash_gbp = $2, updated_at = now() where id = $1`, [PORTFOLIO_ID, newCash]);
 }
 
 async function updateSnapshot(portfolio, openPnl) {
-  const equity = Number(portfolio.cash_gbp) + openPnl + (Number((await getOpenPosition())?.notional_gbp || 0));
+  const pos = await getOpenPosition();
+  const equity = Number(portfolio.cash_gbp) + openPnl + Number(pos?.notional_gbp || 0);
   const peak = Math.max(Number(portfolio.peak_equity_gbp), equity);
   const dd = peak > 0 ? ((peak - equity) / peak) * 100 : 0;
   const maxDd = Math.max(Number(portfolio.max_drawdown_pct), dd);
 
-  await query(`
-    update sf_portfolio
-    set peak_equity_gbp = $2, max_drawdown_pct = $3, updated_at = now()
-    where id = $1
-  `, [PORTFOLIO_ID, peak, maxDd]);
+  await query(`update sf_portfolio set peak_equity_gbp = $2, max_drawdown_pct = $3, updated_at = now() where id = $1`, [PORTFOLIO_ID, peak, maxDd]);
 
   await query(`
     insert into sf_snapshots (
@@ -179,29 +213,39 @@ async function updateSnapshot(portfolio, openPnl) {
 async function main() {
   await ensurePortfolio();
 
+  const portfolioBefore = await getPortfolio();
   let activePairSignal = null;
   let activeLastPrice = null;
-  const portfolioBefore = await getPortfolio();
-  const openBefore = await getOpenPosition();
+  let successCount = 0;
 
   for (const pair of DEFAULT_PAIRS) {
-    const candles = await fetchKlines(pair, TIMEFRAME, 250);
-    const closed = candles.slice(0, -1);
-    const baseSignal = runHmmRegime(closed);
-    const meta = await getRecentTradeMeta(pair);
-    const signal = enrichSignal(baseSignal, {
-      baseThreshold: Number(portfolioBefore.base_confidence),
-      recentReturnPct: meta.recentReturnPct,
-      recentTradeCount: meta.recentTradeCount
-    });
-    const lastPrice = closed[closed.length - 1]?.close ?? null;
+    try {
+      const candles = await fetchKlines(pair, TIMEFRAME, 250);
+      const closed = candles.slice(0, -1);
+      const baseSignal = runHmmRegime(closed);
+      const meta = await getRecentTradeMeta(pair);
+      const signal = enrichSignal(baseSignal, {
+        baseThreshold: Number(portfolioBefore.base_confidence),
+        recentReturnPct: meta.recentReturnPct,
+        recentTradeCount: meta.recentTradeCount
+      });
+      const lastPrice = closed[closed.length - 1]?.close ?? null;
 
-    await upsertMarket(pair, TIMEFRAME, signal, lastPrice);
+      await upsertMarket(pair, TIMEFRAME, signal, lastPrice);
+      successCount += 1;
 
-    if (pair === DEFAULT_PAIRS[0]) {
-      activePairSignal = signal;
-      activeLastPrice = lastPrice;
+      if (pair === DEFAULT_PAIRS[0]) {
+        activePairSignal = signal;
+        activeLastPrice = lastPrice;
+      }
+    } catch (err) {
+      console.error(`Skipping ${pair}: ${err.message}`);
+      continue;
     }
+  }
+
+  if (successCount === 0) {
+    throw new Error('All market data providers failed for all configured pairs');
   }
 
   let portfolio = await getPortfolio();
@@ -231,6 +275,7 @@ async function main() {
 
   console.log(JSON.stringify({
     ok: true,
+    processedPairs: successCount,
     pair: DEFAULT_PAIRS[0],
     decision: activePairSignal?.decision || 'HOLD',
     lastPrice: activeLastPrice,

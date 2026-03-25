@@ -1,5 +1,4 @@
 import Ably from 'ably';
-
 export default async function handler(req, res) {
   try {
     const apiKey = process.env.ABLY_API_KEY;

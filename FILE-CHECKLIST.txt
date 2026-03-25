@@ -1,17 +1,12 @@
-Included required backend files:
-- worker/engine.js
+Repo root should contain:
+- Procfile
+- package.json
+- package-lock.json (generate locally with npm install)
 - db/schema.sql
 - lib/db.js
 - lib/signal-engine.js
-- api/health.js
-- api/config.js
-- api/ably-token.js
+- worker/engine.js
 - api/state.js
 - api/markets.js
 - api/trades.js
 - api/signals.js
-- Procfile
-
-Note:
-- package-lock.json is not included in this zip.
-- If your local repo does not already have a package-lock.json, run `npm install` locally before pushing.

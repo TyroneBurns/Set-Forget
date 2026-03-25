@@ -1,5 +1,4 @@
 import { query } from '../lib/db.js';
-
 export default async function handler(req, res) {
   try {
     const portfolioRows = await query(`select * from sf_portfolio where id = 'main' limit 1`);
@@ -13,17 +12,10 @@ export default async function handler(req, res) {
     const activeMarket = marketRows.rows[0] || null;
     const snapshots = snapshotRows.rows || [];
     const closed = closedTradeRows.rows || [];
-
-    const currentEquity = portfolio
-      ? Number(portfolio.cash_gbp) + Number(openPosition?.notional_gbp || 0)
-      : 0;
+    const currentEquity = portfolio ? Number(portfolio.cash_gbp) + Number(openPosition?.notional_gbp || 0) : 0;
 
     const currentDate = new Date();
-    const keyFor = (daysAgo) => {
-      const d = new Date(currentDate);
-      d.setDate(d.getDate() - daysAgo);
-      return d.toISOString().slice(0,10);
-    };
+    const keyFor = (daysAgo) => { const d = new Date(currentDate); d.setDate(d.getDate() - daysAgo); return d.toISOString().slice(0,10); };
     const baseFor = (daysAgo) => {
       const key = keyFor(daysAgo);
       const matches = snapshots.filter(s => s.snapshot_day <= key).sort((a,b)=>String(a.snapshot_day).localeCompare(String(b.snapshot_day)));
@@ -33,24 +25,12 @@ export default async function handler(req, res) {
     const weekBase = baseFor(7);
     const dayReturnPct = dayBase ? ((currentEquity - dayBase) / dayBase) * 100 : 0;
     const weekReturnPct = weekBase ? ((currentEquity - weekBase) / weekBase) * 100 : 0;
-
     const winCount = closed.filter(t => Number(t.pnl_gbp || 0) > 0).length;
     const winRate = closed.length ? (winCount / closed.length) * 100 : 0;
 
     res.statusCode = 200;
     res.setHeader('content-type', 'application/json');
-    res.end(JSON.stringify({
-      portfolio,
-      openPosition,
-      activeMarket,
-      metrics: {
-        currentEquity,
-        dayReturnPct,
-        weekReturnPct,
-        winRate,
-        tradeCount: closed.length
-      }
-    }));
+    res.end(JSON.stringify({ portfolio, openPosition, activeMarket, metrics: { currentEquity, dayReturnPct, weekReturnPct, winRate, tradeCount: closed.length } }));
   } catch (error) {
     res.statusCode = 500;
     res.setHeader('content-type', 'application/json');
