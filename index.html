@@ -17,7 +17,25 @@
           <div class="title" id="appName">Set & Forget</div>
         </div>
       </div>
-      <div class="notice">Upgraded layout with live trade visibility, open PnL, exposure, and clearer ready / in-trade states.</div>
+      <div class="notice">A live paper-trading dashboard using a Hidden Markov Model to estimate whether the market is bullish, bearish, or choppy before making or skipping trades.</div>
+    </section>
+
+    <section class="card explain-card">
+      <button class="explain-toggle" id="explainToggle" type="button">
+        <span>How the HMM model works</span>
+        <span id="explainChevron">＋</span>
+      </button>
+      <div class="explain-body hidden" id="explainBody">
+        <p>Set & Forget uses a Hidden Markov Model to estimate whether the market is currently in a <strong>bull</strong>, <strong>bear</strong>, or <strong>chop</strong> regime.</p>
+        <p>It looks at recent <strong>momentum</strong> and <strong>volatility</strong>, updates the probability of each regime on every run, then compares signal strength against a required threshold.</p>
+        <div class="explain-grid">
+          <div class="explain-box"><div class="small">Bull / Bear / Chop %</div><div class="explain-value">Regime probability</div></div>
+          <div class="explain-box"><div class="small">Confidence</div><div class="explain-value">Strength of the leader</div></div>
+          <div class="explain-box"><div class="small">Quality</div><div class="explain-value">Overall setup score</div></div>
+          <div class="explain-box"><div class="small">Threshold</div><div class="explain-value">Minimum score to act</div></div>
+        </div>
+        <p>If confidence and quality are strong enough, the app can open or close trades automatically. If not, it waits instead of forcing action.</p>
+      </div>
     </section>
 
     <section class="card">
@@ -30,6 +48,35 @@
           <div class="pill" id="nextRunPill">Next run 5:00</div>
         </div>
         <div class="banner-list" id="livePositionsList"></div>
+      </div>
+    </section>
+
+    <section class="card chart-card">
+      <div class="panel">
+        <div class="row">
+          <div>
+            <div class="kicker">Equity curve</div>
+            <div class="title-sm" id="equityHeadline">£0.00</div>
+          </div>
+          <div class="chart-meta" id="equityMeta">No history yet</div>
+        </div>
+        <canvas id="equityCanvas" height="170"></canvas>
+      </div>
+    </section>
+
+    <section class="card why-card">
+      <div class="panel">
+        <div class="kicker">Why this trade</div>
+        <div class="why-title" id="whyPair">Waiting for signal</div>
+        <div class="why-text" id="whyText">The engine will explain its current leading regime and whether that is strong enough to act.</div>
+        <div class="why-grid">
+          <div class="mini"><div class="label">Decision</div><div class="value" id="whyDecision">–</div></div>
+          <div class="mini"><div class="label">State</div><div class="value" id="whyState">–</div></div>
+          <div class="mini"><div class="label">Confidence</div><div class="value" id="whyConfidence">–</div></div>
+          <div class="mini"><div class="label">Quality</div><div class="value" id="whyQuality">–</div></div>
+          <div class="mini"><div class="label">Threshold</div><div class="value" id="whyThreshold">–</div></div>
+          <div class="mini"><div class="label">Regime</div><div class="value" id="whyRegime">–</div></div>
+        </div>
       </div>
     </section>
 

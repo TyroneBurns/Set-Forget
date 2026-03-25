@@ -1,30 +1,14 @@
 const el = {
-  appName:q('#appName'),
-  pairBig:q('#pairBig'),
-  stateBadge:q('#stateBadge'),
-  lastPrice:q('#lastPrice'),
-  statusText:q('#statusText'),
-  bullPct:q('#bullPct'),
-  bearPct:q('#bearPct'),
-  chopPct:q('#chopPct'),
-  qualityValue:q('#qualityValue'),
-  adaptiveValue:q('#adaptiveValue'),
-  equityStat:q('#equityStat'),
-  cashStat:q('#cashStat'),
-  openPnlStat:q('#openPnlStat'),
-  exposureStat:q('#exposureStat'),
-  realisedStat:q('#realisedStat'),
-  positionStat:q('#positionStat'),
-  dayReturnStat:q('#dayReturnStat'),
-  weekReturnStat:q('#weekReturnStat'),
-  winRateStat:q('#winRateStat'),
-  tradeCountStat:q('#tradeCountStat'),
-  marketsList:q('#marketsList'),
-  signalsList:q('#signalsList'),
-  tradesList:q('#tradesList'),
-  livePositionsList:q('#livePositionsList'),
-  liveCount:q('#liveCount'),
-  nextRunPill:q('#nextRunPill')
+  appName:q('#appName'), pairBig:q('#pairBig'), stateBadge:q('#stateBadge'), lastPrice:q('#lastPrice'), statusText:q('#statusText'),
+  bullPct:q('#bullPct'), bearPct:q('#bearPct'), chopPct:q('#chopPct'), qualityValue:q('#qualityValue'), adaptiveValue:q('#adaptiveValue'),
+  equityStat:q('#equityStat'), cashStat:q('#cashStat'), openPnlStat:q('#openPnlStat'), exposureStat:q('#exposureStat'),
+  realisedStat:q('#realisedStat'), positionStat:q('#positionStat'), dayReturnStat:q('#dayReturnStat'), weekReturnStat:q('#weekReturnStat'),
+  winRateStat:q('#winRateStat'), tradeCountStat:q('#tradeCountStat'), marketsList:q('#marketsList'), signalsList:q('#signalsList'),
+  tradesList:q('#tradesList'), livePositionsList:q('#livePositionsList'), liveCount:q('#liveCount'), nextRunPill:q('#nextRunPill'),
+  equityHeadline:q('#equityHeadline'), equityMeta:q('#equityMeta'), equityCanvas:q('#equityCanvas'),
+  whyPair:q('#whyPair'), whyText:q('#whyText'), whyDecision:q('#whyDecision'), whyState:q('#whyState'),
+  whyConfidence:q('#whyConfidence'), whyQuality:q('#whyQuality'), whyThreshold:q('#whyThreshold'), whyRegime:q('#whyRegime'),
+  explainToggle:q('#explainToggle'), explainBody:q('#explainBody'), explainChevron:q('#explainChevron')
 };
 
 let nextRunSeconds = 300;
@@ -32,6 +16,7 @@ let nextRunTimer;
 
 async function boot() {
   bindTabs();
+  bindExplainer();
   await loadConfig();
   await refreshAll();
   setInterval(refreshAll, 30000);
@@ -46,6 +31,13 @@ function bindTabs() {
     q('#signalsPanel').classList.toggle('hidden', tab !== 'signals');
     q('#tradesPanel').classList.toggle('hidden', tab !== 'trades');
   }));
+}
+
+function bindExplainer() {
+  el.explainToggle.addEventListener('click', () => {
+    const hidden = el.explainBody.classList.toggle('hidden');
+    el.explainChevron.textContent = hidden ? '＋' : '－';
+  });
 }
 
 async function loadConfig() {
@@ -65,6 +57,7 @@ function startNextRunCountdown() {
     renderNextRun(remain);
   }, 1000);
 }
+
 function renderNextRun(seconds) {
   const m = Math.floor(seconds / 60);
   const s = String(seconds % 60).padStart(2, '0');
@@ -83,12 +76,12 @@ async function refreshAll() {
     const markets = await marketsRes.json();
     const trades = await tradesRes.json();
     const signals = await signalsRes.json();
-
     renderState(state);
     renderMarkets(state.readyMarkets || markets, state.openPositions || []);
     renderTrades(trades);
     renderSignals(signals);
-
+    renderWhy(state.whyThisTrade);
+    renderEquityChart(state.equityHistory || [], state.metrics || {});
     nextRunSeconds = 300;
     startNextRunCountdown();
   } catch {
@@ -106,6 +99,7 @@ function renderState(data) {
   el.stateBadge.textContent = market?.state || 'NO DATA';
   el.lastPrice.textContent = market?.last_price ? fmtNum(market.last_price) : '–';
   el.statusText.textContent = market ? `${market.decision} • Confidence ${fmtNum(market.confidence_pct)}% • Quality ${fmtNum(market.quality_score)}` : 'Waiting for worker run';
+
   el.bullPct.textContent = `${fmtNum(market?.bull_pct || 0)}%`;
   el.bearPct.textContent = `${fmtNum(market?.bear_pct || 0)}%`;
   el.chopPct.textContent = `${fmtNum(market?.chop_pct || 0)}%`;
@@ -137,7 +131,7 @@ function renderLivePositions(rows) {
   if (!rows.length) {
     const empty = document.createElement('div');
     empty.className = 'banner';
-    empty.innerHTML = `<div class="small muted">No live positions yet. The engine will open trades when signal quality is above threshold.</div>`;
+    empty.innerHTML = `<div class="small">No live positions yet. The engine will open trades when signal quality is above threshold.</div>`;
     el.livePositionsList.appendChild(empty);
     return;
   }
@@ -149,7 +143,7 @@ function renderLivePositions(rows) {
       <div class="banner-head">
         <div>
           <div class="banner-title">${p.side} ${p.pair}</div>
-          <div class="banner-sub">Entry ${fmtNum(p.entry_price)} • Last ${p.last_price ? fmtNum(p.last_price) : '–'} • ${new Date(p.opened_at).toLocaleString()}</div>
+          <div class="banner-sub">Entry ${fmtNum(p.entry_price)} • Last ${p.last_price ? fmtNum(p.last_price) : '–'} • ${fmtDuration(p.duration_minutes || 0)}</div>
         </div>
         <div class="pill trade">LIVE</div>
       </div>
@@ -181,7 +175,7 @@ function renderMarkets(rows, openPositions) {
         <div class="pill ${cls}">${status}</div>
       </div>
       <div class="bottom">
-        <div class="small muted">Quality ${fmtNum(m.quality_score)} • Conf ${fmtNum(m.confidence_pct)}%</div>
+        <div class="small">Quality ${fmtNum(m.quality_score)} • Conf ${fmtNum(m.confidence_pct)}%</div>
         <div class="rhs">
           <div class="name" style="font-size:15px">${m.state}</div>
           <div class="action">${m.decision}</div>
@@ -197,6 +191,8 @@ function renderTrades(rows) {
   rows.forEach((t) => {
     const pnl = Number(t.pnl_gbp || 0);
     const pnlClass = pnl >= 0 ? 'good' : 'bad';
+    const pct = Number(t.notional_gbp || 0) && t.pnl_gbp != null ? (Number(t.pnl_gbp) / Number(t.notional_gbp)) * 100 : null;
+    const duration = t.opened_at ? fmtDuration(calcDurationMinutes(t.opened_at, t.closed_at || t.created_at)) : '–';
     const item = document.createElement('div');
     item.className = 'trade-card';
     item.innerHTML = `
@@ -208,10 +204,15 @@ function renderTrades(rows) {
         <div class="pill">${t.exit_price ? fmtNum(t.exit_price) : fmtNum(t.entry_price)}</div>
       </div>
       <div class="bottom">
-        <div class="small muted">${gbp(t.notional_gbp || 0)}</div>
+        <div class="small">
+          ${gbp(t.notional_gbp || 0)}
+          ${t.entry_price ? ` • Entry ${fmtNum(t.entry_price)}` : ''}
+          ${t.exit_price ? ` • Exit ${fmtNum(t.exit_price)}` : ''}
+          • ${duration}
+        </div>
         <div class="rhs">
           <div class="name ${pnlClass}" style="font-size:15px">${t.pnl_gbp != null ? gbp(t.pnl_gbp) : 'Open'}</div>
-          <div class="action">${t.type}</div>
+          <div class="action">${pct != null ? fmtPct(pct) : t.type}</div>
         </div>
       </div>
     `;
@@ -233,7 +234,7 @@ function renderSignals(rows) {
         <div class="pill">${s.state}</div>
       </div>
       <div class="bottom">
-        <div class="small muted">Q ${fmtNum(s.quality_score)} • Thr ${fmtNum(s.adaptive_threshold)} • Bull ${fmtNum(s.bull_pct)}%</div>
+        <div class="small">Q ${fmtNum(s.quality_score)} • Thr ${fmtNum(s.adaptive_threshold)} • Bull ${fmtNum(s.bull_pct)}%</div>
         <div class="rhs">
           <div class="name" style="font-size:15px">${s.decision}</div>
           <div class="action">${s.timeframe}</div>
@@ -242,6 +243,95 @@ function renderSignals(rows) {
     `;
     el.signalsList.appendChild(item);
   });
+}
+
+function renderWhy(why) {
+  if (!why) return;
+  el.whyPair.textContent = why.pair;
+  el.whyText.textContent = why.explanation;
+  el.whyDecision.textContent = why.decision;
+  el.whyState.textContent = why.state;
+  el.whyConfidence.textContent = fmtPct(why.confidencePct);
+  el.whyQuality.textContent = fmtNum(why.qualityScore);
+  el.whyThreshold.textContent = fmtNum(why.threshold);
+  el.whyRegime.textContent = `B ${fmtNum(why.bullPct)} / Br ${fmtNum(why.bearPct)} / C ${fmtNum(why.chopPct)}`;
+}
+
+function renderEquityChart(history, metrics) {
+  const canvas = el.equityCanvas;
+  const dpr = window.devicePixelRatio || 1;
+  const width = canvas.clientWidth || 440;
+  const height = 170;
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, width, height);
+
+  const points = history.length ? history.map(h => Number(h.equity || 0)) : [Number(metrics.currentEquity || 0)];
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const paddedMin = min === max ? min - 1 : min - (max - min) * 0.12;
+  const paddedMax = min === max ? max + 1 : max + (max - min) * 0.12;
+
+  const left = 10, right = width - 10, top = 10, bottom = height - 16;
+  const chartW = right - left, chartH = bottom - top;
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    const y = top + (chartH / 3) * i;
+    ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
+  }
+
+  const coords = points.map((v, i) => ({
+    x: left + (points.length === 1 ? chartW / 2 : (i / (points.length - 1)) * chartW),
+    y: bottom - ((v - paddedMin) / (paddedMax - paddedMin)) * chartH,
+    v
+  }));
+
+  const grad = ctx.createLinearGradient(0, top, 0, bottom);
+  grad.addColorStop(0, 'rgba(125,124,255,0.35)');
+  grad.addColorStop(1, 'rgba(125,124,255,0.02)');
+
+  ctx.beginPath();
+  coords.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  ctx.lineTo(coords[coords.length - 1].x, bottom);
+  ctx.lineTo(coords[0].x, bottom);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.beginPath();
+  coords.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  ctx.strokeStyle = '#8f88ff';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  const last = coords[coords.length - 1];
+  ctx.beginPath();
+  ctx.arc(last.x, last.y, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#c8c5ff';
+  ctx.fill();
+
+  el.equityHeadline.textContent = gbp(metrics.currentEquity || 0);
+  el.equityMeta.textContent = history.length
+    ? `${history.length} snapshot${history.length === 1 ? '' : 's'} • 1 day ${fmtPct(metrics.dayReturnPct || 0)} • 7 day ${fmtPct(metrics.weekReturnPct || 0)}`
+    : 'Waiting for more history';
+}
+
+function calcDurationMinutes(startIso, endIso = null) {
+  if (!startIso) return 0;
+  const start = new Date(startIso).getTime();
+  const end = endIso ? new Date(endIso).getTime() : Date.now();
+  return Math.max(0, Math.round((end - start) / 60000));
+}
+
+function fmtDuration(minutes) {
+  const mins = Number(minutes || 0);
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h <= 0 ? `${m}m live` : `${h}h ${m}m live`;
 }
 
 function setGoodBad(node, value) {
