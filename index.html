@@ -1,1 +1,92 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Set & Forget</title><meta name="theme-color" content="#060816"><link rel="stylesheet" href="./styles.css"></head><body><div class="wrap"><section class="card"><div class="head"><div class="logo">SF</div><div><div class="kicker">Always-on paper trader</div><div class="title" id="appName">Set & Forget</div></div></div><div class="notice">v5.1 adds resilient market data fallback so one bad endpoint no longer kills the worker.</div></section><section class="card"><div class="live"><div class="live-top"><div><div class="kicker">Current engine state</div><div class="pair-big" id="pairBig">–</div></div><div class="badge" id="stateBadge">NO DATA</div></div><div class="price-label">Last price</div><div class="price" id="lastPrice">–</div><div class="status" id="statusText">Waiting for database state…</div><div class="probs"><div class="prob"><div class="label">Bull</div><div class="value" id="bullPct">0%</div></div><div class="prob"><div class="label">Bear</div><div class="value" id="bearPct">0%</div></div><div class="prob"><div class="label">Chop</div><div class="value" id="chopPct">0%</div></div></div><div class="quality-grid"><div class="mini"><div class="label">Quality</div><div class="value" id="qualityValue">0</div></div><div class="mini"><div class="label">Threshold</div><div class="value" id="adaptiveValue">0</div></div></div></div></section><section class="card"><div class="tabs"><button class="tab active" data-tab="overview">Overview</button><button class="tab" data-tab="markets">Markets</button><button class="tab" data-tab="signals">Signals</button><button class="tab" data-tab="trades">Trades</button></div><div class="panel" id="overviewPanel"><div class="grid-2"><div class="stat"><div class="small">Current equity</div><div class="big" id="equityStat">£0</div></div><div class="stat"><div class="small">Cash</div><div class="big" id="cashStat">£0</div></div><div class="stat"><div class="small">Realised PnL</div><div class="big" id="realisedStat">£0</div></div><div class="stat"><div class="small">Open position</div><div class="big" id="positionStat">None</div></div><div class="stat"><div class="small">1 day return</div><div class="big" id="dayReturnStat">0%</div></div><div class="stat"><div class="small">7 day return</div><div class="big" id="weekReturnStat">0%</div></div><div class="stat"><div class="small">Win rate</div><div class="big" id="winRateStat">0%</div></div><div class="stat"><div class="small">Trades closed</div><div class="big" id="tradeCountStat">0</div></div></div></div><div class="panel hidden" id="marketsPanel"><div class="list" id="marketsList"></div></div><div class="panel hidden" id="signalsPanel"><div class="list" id="signalsList"></div></div><div class="panel hidden" id="tradesPanel"><div class="list" id="tradesList"></div></div></section></div><script type="module" src="./app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Set & Forget</title>
+  <meta name="theme-color" content="#060816">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="wrap">
+    <section class="card hero">
+      <div class="head">
+        <div class="logo">SF</div>
+        <div>
+          <div class="kicker">Always-on paper trader</div>
+          <div class="title" id="appName">Set & Forget</div>
+        </div>
+      </div>
+      <div class="notice">Upgraded layout with live trade visibility, open PnL, exposure, and clearer ready / in-trade states.</div>
+    </section>
+
+    <section class="card">
+      <div class="panel">
+        <div class="row top-row">
+          <div>
+            <div class="kicker">Live trades</div>
+            <div class="title-sm" id="liveCount">0 open trades</div>
+          </div>
+          <div class="pill" id="nextRunPill">Next run 5:00</div>
+        </div>
+        <div class="banner-list" id="livePositionsList"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="live">
+        <div class="live-top">
+          <div>
+            <div class="kicker">Current engine leader</div>
+            <div class="pair-big" id="pairBig">–</div>
+          </div>
+          <div class="badge" id="stateBadge">NO DATA</div>
+        </div>
+        <div class="price-label">Last price</div>
+        <div class="price" id="lastPrice">–</div>
+        <div class="status" id="statusText">Waiting for database state…</div>
+
+        <div class="probs">
+          <div class="prob"><div class="label">Bull</div><div class="value" id="bullPct">0%</div></div>
+          <div class="prob"><div class="label">Bear</div><div class="value" id="bearPct">0%</div></div>
+          <div class="prob"><div class="label">Chop</div><div class="value" id="chopPct">0%</div></div>
+        </div>
+
+        <div class="quality-grid">
+          <div class="mini"><div class="label">Quality</div><div class="value" id="qualityValue">0</div></div>
+          <div class="mini"><div class="label">Threshold</div><div class="value" id="adaptiveValue">0</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="tabs">
+        <button class="tab active" data-tab="overview">Overview</button>
+        <button class="tab" data-tab="markets">Markets</button>
+        <button class="tab" data-tab="signals">Signals</button>
+        <button class="tab" data-tab="trades">Trades</button>
+      </div>
+
+      <div class="panel" id="overviewPanel">
+        <div class="grid-2">
+          <div class="stat"><div class="small">Current equity</div><div class="big" id="equityStat">£0</div></div>
+          <div class="stat"><div class="small">Cash</div><div class="big" id="cashStat">£0</div></div>
+          <div class="stat"><div class="small">Open PnL</div><div class="big" id="openPnlStat">£0</div></div>
+          <div class="stat"><div class="small">Exposure</div><div class="big" id="exposureStat">£0</div></div>
+          <div class="stat"><div class="small">Realised PnL</div><div class="big" id="realisedStat">£0</div></div>
+          <div class="stat"><div class="small">Open trades</div><div class="big" id="positionStat">0</div></div>
+          <div class="stat"><div class="small">1 day return</div><div class="big" id="dayReturnStat">0%</div></div>
+          <div class="stat"><div class="small">7 day return</div><div class="big" id="weekReturnStat">0%</div></div>
+          <div class="stat"><div class="small">Win rate</div><div class="big" id="winRateStat">0%</div></div>
+          <div class="stat"><div class="small">Trades closed</div><div class="big" id="tradeCountStat">0</div></div>
+        </div>
+      </div>
+
+      <div class="panel hidden" id="marketsPanel"><div class="list" id="marketsList"></div></div>
+      <div class="panel hidden" id="signalsPanel"><div class="list" id="signalsList"></div></div>
+      <div class="panel hidden" id="tradesPanel"><div class="list" id="tradesList"></div></div>
+    </section>
+  </div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
