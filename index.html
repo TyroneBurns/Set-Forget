@@ -13,12 +13,12 @@
       <div class="head">
         <div class="logo">SF</div>
         <div class="hero-copy">
-          <div class="kicker">Always-on paper trader</div>
+          <div class="kicker">Profit optimisation mode</div>
           <div class="title" id="appName">Set & Forget</div>
         </div>
         <button class="settings-fab" id="settingsToggle" type="button">⚙️</button>
       </div>
-      <div class="notice">Now supports multi-position paper trading and editable HMM controls from the dashboard.</div>
+      <div class="notice">Multi-position trading, capped exposure, confidence-weighted sizing, correlation control, and optional self-optimisation with guardrails.</div>
 
       <div class="settings-panel hidden" id="settingsPanel">
         <div class="settings-segment">
@@ -26,28 +26,9 @@
           <button class="seg" type="button">Full Page</button>
         </div>
 
-        <div class="field">
-          <label>Market data source</label>
-          <select id="marketDataSource">
-            <option>Binance public candles</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <label>Symbols</label>
-          <input id="symbols" placeholder="BTCUSDT,ETHUSDT,SOLUSDT">
-        </div>
-
-        <div class="field">
-          <label>Interval</label>
-          <select id="interval">
-            <option>5m</option>
-            <option selected>15m</option>
-            <option>1h</option>
-            <option>4h</option>
-          </select>
-        </div>
-
+        <div class="field"><label>Market data source</label><select id="marketDataSource"><option>Binance public candles</option></select></div>
+        <div class="field"><label>Symbols</label><input id="symbols" placeholder="BTCUSDT,ETHUSDT,SOLUSDT"></div>
+        <div class="field"><label>Interval</label><select id="interval"><option>5m</option><option selected>15m</option><option>1h</option><option>4h</option></select></div>
         <div class="field"><label>Refresh every</label><input id="refreshSeconds" type="number"></div>
         <div class="field"><label>Lookback period</label><input id="lookbackPeriod" type="number"></div>
         <div class="field"><label>Min confidence %</label><input id="minConfidencePct" type="number"></div>
@@ -58,11 +39,15 @@
         <div class="field"><label>Risk per trade %</label><input id="riskPerTradePct" type="number"></div>
         <div class="field"><label>Stop loss %</label><input id="stopLossPct" type="number" step="0.1"></div>
         <div class="field"><label>Take profit %</label><input id="takeProfitPct" type="number" step="0.1"></div>
+        <div class="field"><label>Max open positions</label><input id="maxOpenPositions" type="number"></div>
+        <div class="field"><label>Max correlated positions</label><input id="maxCorrelatedPositions" type="number"></div>
+        <div class="field"><label>Sizing mode</label><select id="sizingMode"><option value="fixed">Fixed</option><option value="confidence_weighted">Confidence weighted</option></select></div>
+        <div class="field"><label>Optimiser lookback days</label><input id="optimiserLookbackDays" type="number"></div>
 
-        <label class="toggle-row">
-          <input id="exitOnChop" type="checkbox">
-          <span>Exit demo trades on chop</span>
-        </label>
+        <label class="toggle-row"><input id="exitOnChop" type="checkbox"><span>Exit demo trades on chop</span></label>
+        <label class="toggle-row"><input id="autoOptimise" type="checkbox"><span>Auto-optimise controls</span></label>
+        <label class="toggle-row"><input id="autoRiskAdjust" type="checkbox"><span>Auto-adjust risk</span></label>
+        <label class="toggle-row"><input id="autoThresholdAdjust" type="checkbox"><span>Auto-adjust threshold</span></label>
 
         <div class="settings-actions">
           <button class="btn ghost" id="settingsClose" type="button">Close</button>
@@ -95,6 +80,23 @@
           <div class="chart-meta" id="equityMeta">No history yet</div>
         </div>
         <canvas id="equityCanvas" height="170"></canvas>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="panel">
+        <div class="row">
+          <div>
+            <div class="kicker">Optimiser</div>
+            <div class="title-sm" id="optimiserTitle">Manual mode</div>
+          </div>
+          <div class="pill ready" id="effectiveRiskPill">Risk –</div>
+        </div>
+        <div class="notice slim" id="optimiserSummary">Auto-optimiser is off.</div>
+        <div class="grid-2 tight">
+          <div class="stat smallstat"><div class="small">Effective confidence floor</div><div class="big" id="effectiveConfidenceStat">–</div></div>
+          <div class="stat smallstat"><div class="small">Effective risk / trade</div><div class="big" id="effectiveRiskStat">–</div></div>
+        </div>
       </div>
     </section>
 

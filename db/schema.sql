@@ -29,6 +29,10 @@ create table if not exists sf_positions (
   take_profit_price numeric,
   source text not null default 'auto',
   status text not null default 'open',
+  confidence_pct numeric,
+  quality_score numeric,
+  adaptive_threshold numeric,
+  opened_reason text,
   opened_at timestamptz not null default now(),
   closed_at timestamptz
 );
@@ -50,6 +54,9 @@ create table if not exists sf_trades (
   type text not null,
   source text not null default 'auto',
   reason text,
+  confidence_pct numeric,
+  quality_score numeric,
+  adaptive_threshold numeric,
   opened_at timestamptz,
   closed_at timestamptz,
   created_at timestamptz not null default now()
@@ -91,18 +98,39 @@ create table if not exists sf_markets (
 create table if not exists sf_snapshots (
   id bigserial primary key,
   portfolio_id text not null references sf_portfolio(id) on delete cascade,
-  snapshot_day date not null,
+  snapshot_at timestamptz not null default now(),
+  snapshot_day date not null default current_date,
   equity_gbp numeric not null,
   cash_gbp numeric not null,
+  exposure_gbp numeric not null default 0,
   open_pnl_gbp numeric not null,
   realised_pnl_gbp numeric not null,
-  created_at timestamptz not null default now(),
-  unique (portfolio_id, snapshot_day)
+  unique (portfolio_id, snapshot_at)
 );
 
-alter table sf_positions add column if not exists stop_loss_price numeric;
-alter table sf_positions add column if not exists take_profit_price numeric;
-alter table sf_trades add column if not exists reason text;
+create table if not exists sf_optimizer_events (
+  id bigserial primary key,
+  portfolio_id text not null,
+  changed_at timestamptz not null default now(),
+  reason text not null,
+  previous_value jsonb not null,
+  new_value jsonb not null,
+  summary text
+);
+
+alter table sf_positions add column if not exists confidence_pct numeric;
+alter table sf_positions add column if not exists quality_score numeric;
+alter table sf_positions add column if not exists adaptive_threshold numeric;
+alter table sf_positions add column if not exists opened_reason text;
+
+alter table sf_trades add column if not exists confidence_pct numeric;
+alter table sf_trades add column if not exists quality_score numeric;
+alter table sf_trades add column if not exists adaptive_threshold numeric;
+
+alter table sf_snapshots add column if not exists snapshot_at timestamptz not null default now();
+alter table sf_snapshots add column if not exists exposure_gbp numeric not null default 0;
 
 create index if not exists idx_sf_trades_portfolio_created on sf_trades (portfolio_id, created_at desc);
 create index if not exists idx_sf_signals_pair_created on sf_signals (pair, created_at desc);
+create index if not exists idx_sf_snapshots_portfolio_time on sf_snapshots (portfolio_id, snapshot_at desc);
+create index if not exists idx_sf_optimizer_events_portfolio_time on sf_optimizer_events (portfolio_id, changed_at desc);
