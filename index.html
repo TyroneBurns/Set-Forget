@@ -1,181 +1,84 @@
 <!doctype html>
-<html lang='en'>
+<html lang="en">
 <head>
-  <meta charset='UTF-8'>
-  <meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>Set & Forget</title>
-  <meta name='theme-color' content='#060816'>
-  <link rel='stylesheet' href='./styles.css'>
-  <script src='https://cdn.ably.com/lib/ably.min-1.js'></script>
+  <meta name="theme-color" content="#060816">
+  <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <div class='wrap'>
-    <section class='card'>
-      <div class='head'>
-        <div class='logo'>SF</div>
-        <div class='head-copy'>
-          <div class='kicker'>Signal Trader</div>
-          <div class='title' id='appName'>Set & Forget</div>
+  <div class="wrap">
+    <section class="card">
+      <div class="head">
+        <div class="logo">SF</div>
+        <div>
+          <div class="kicker">Always-on paper trader</div>
+          <div class="title" id="appName">Set & Forget</div>
         </div>
       </div>
-
-      <div class='top-grid'>
-        <div class='field'>
-          <label>Pair</label>
-          <select class='select' id='pairSelect'></select>
-        </div>
-        <div class='field'>
-          <label>Size</label>
-          <input class='input' id='sizeInput' type='number' min='1' step='1' value='100'>
-        </div>
-        <div class='field'>
-          <label>&nbsp;</label>
-          <button class='gear' id='gearBtn' type='button'>⚙️</button>
-        </div>
-      </div>
-
-      <div class='settings' id='settings'>
-        <div class='settings-grid'>
-          <div class='field'>
-            <label>Timeframe</label>
-            <select class='select' id='timeframeSelect'>
-              <option>5m</option>
-              <option selected>15m</option>
-              <option>1h</option>
-              <option>4h</option>
-            </select>
-          </div>
-          <div class='field'>
-            <label>Mode</label>
-            <select class='select' id='modeSelect'>
-              <option value='manual'>Manual</option>
-              <option value='auto'>Auto</option>
-            </select>
-          </div>
-          <div class='field'>
-            <label>Base confidence</label>
-            <input class='input' id='thresholdInput' type='number' min='50' max='95' step='1' value='65'>
-          </div>
-          <div class='field'>
-            <label>Auto refresh seconds</label>
-            <input class='input' id='refreshInput' type='number' min='5' max='120' step='1' value='15'>
-          </div>
-        </div>
-      </div>
+      <div class="notice">v5 uses Northflank Postgres + scheduled worker, so the engine keeps running even when the app is closed.</div>
     </section>
 
-    <section class='card'>
-      <div class='live'>
-        <div class='live-top'>
+    <section class="card">
+      <div class="live">
+        <div class="live-top">
           <div>
-            <div class='kicker'>Live Signal</div>
-            <div class='pair-big' id='pairBig'>BTCUSDT • 15m</div>
+            <div class="kicker">Current engine state</div>
+            <div class="pair-big" id="pairBig">–</div>
           </div>
-          <div class='badge' id='stateBadge'>NO TRADE</div>
+          <div class="badge" id="stateBadge">NO DATA</div>
+        </div>
+        <div class="price-label">Last price</div>
+        <div class="price" id="lastPrice">–</div>
+        <div class="status" id="statusText">Waiting for database state…</div>
+
+        <div class="probs">
+          <div class="prob"><div class="label">Bull</div><div class="value" id="bullPct">0%</div></div>
+          <div class="prob"><div class="label">Bear</div><div class="value" id="bearPct">0%</div></div>
+          <div class="prob"><div class="label">Chop</div><div class="value" id="chopPct">0%</div></div>
         </div>
 
-        <div class='price-label'>Last price</div>
-        <div class='price' id='lastPrice'>–</div>
-        <div class='status' id='statusText'>Waiting for live market data</div>
-
-        <div class='probs'>
-          <div class='prob'>
-            <div class='label'>Bull</div>
-            <div class='value' id='bullPct'>0%</div>
-          </div>
-          <div class='prob'>
-            <div class='label'>Bear</div>
-            <div class='value' id='bearPct'>0%</div>
-          </div>
-          <div class='prob'>
-            <div class='label'>Chop</div>
-            <div class='value' id='chopPct'>0%</div>
-          </div>
-        </div>
-
-        <div class='quality-grid'>
-          <div class='mini'>
-            <div class='label'>Signal quality</div>
-            <div class='value' id='qualityValue'>0</div>
-          </div>
-          <div class='mini'>
-            <div class='label'>Adaptive threshold</div>
-            <div class='value' id='adaptiveValue'>65</div>
-          </div>
-        </div>
-
-        <div class='actions'>
-          <button class='btn buy' id='buyBtn'>Buy</button>
-          <button class='btn sell' id='sellBtn'>Sell</button>
-          <button class='btn secondary' id='closeBtn'>Close</button>
-          <button class='btn secondary' id='refreshBtn'>Refresh</button>
+        <div class="quality-grid">
+          <div class="mini"><div class="label">Quality</div><div class="value" id="qualityValue">0</div></div>
+          <div class="mini"><div class="label">Threshold</div><div class="value" id="adaptiveValue">0</div></div>
         </div>
       </div>
-
-      <div class='notice' id='notice'>Ably optional. Local engine is active.</div>
     </section>
 
-    <section class='card'>
-      <div class='tabs tabs-5'>
-        <button class='tab active' data-tab='overview'>Overview</button>
-        <button class='tab' data-tab='markets'>Markets</button>
-        <button class='tab' data-tab='signals'>Signals</button>
-        <button class='tab' data-tab='trades'>Trades</button>
-        <button class='tab' data-tab='how'>How it works</button>
+    <section class="card">
+      <div class="tabs">
+        <button class="tab active" data-tab="overview">Overview</button>
+        <button class="tab" data-tab="markets">Markets</button>
+        <button class="tab" data-tab="signals">Signals</button>
+        <button class="tab" data-tab="trades">Trades</button>
+        <button class="tab" data-tab="how">How it works</button>
       </div>
 
-      <div class='panel' id='overviewPanel'>
-        <div class='grid-2'>
-          <div class='stat'><div class='small'>Mode</div><div class='big' id='modeStat'>Manual</div></div>
-          <div class='stat'><div class='small'>Confidence</div><div class='big' id='confidenceStat'>-</div></div>
-          <div class='stat'><div class='small'>Signal quality</div><div class='big' id='qualityStat'>0</div></div>
-          <div class='stat'><div class='small'>Adaptive threshold</div><div class='big' id='adaptiveStat'>65</div></div>
-          <div class='stat'><div class='small'>Realised PnL</div><div class='big' id='pnlStat'>0.00</div></div>
-          <div class='stat'><div class='small'>Open position</div><div class='big' id='positionStat'>None</div></div>
-          <div class='stat'><div class='small'>1 day return</div><div class='big' id='dayReturnStat'>0%</div></div>
-          <div class='stat'><div class='small'>7 day return</div><div class='big' id='weekReturnStat'>0%</div></div>
+      <div class="panel" id="overviewPanel">
+        <div class="grid-2">
+          <div class="stat"><div class="small">Current equity</div><div class="big" id="equityStat">£0</div></div>
+          <div class="stat"><div class="small">Cash</div><div class="big" id="cashStat">£0</div></div>
+          <div class="stat"><div class="small">Realised PnL</div><div class="big" id="realisedStat">£0</div></div>
+          <div class="stat"><div class="small">Open position</div><div class="big" id="positionStat">None</div></div>
+          <div class="stat"><div class="small">1 day return</div><div class="big" id="dayReturnStat">0%</div></div>
+          <div class="stat"><div class="small">7 day return</div><div class="big" id="weekReturnStat">0%</div></div>
+          <div class="stat"><div class="small">Win rate</div><div class="big" id="winRateStat">0%</div></div>
+          <div class="stat"><div class="small">Trades closed</div><div class="big" id="tradeCountStat">0</div></div>
         </div>
       </div>
 
-      <div class='panel hidden' id='marketsPanel'><div class='list' id='marketsList'></div></div>
-      <div class='panel hidden' id='signalsPanel'><div class='list' id='signalsList'></div></div>
-      <div class='panel hidden' id='tradesPanel'><div class='list' id='tradesList'></div></div>
-
-      <div class='panel hidden' id='howPanel'>
-        <div class='explain'>
-          <h3>How the HMM strategy works</h3>
-          <p>This app uses a Hidden Markov Model style regime engine to estimate whether the market is in a bull, bear, or chop state. It reads recent closed candles, measures momentum and ATR-based volatility, then updates probabilities as new candles arrive.</p>
-          <p>The engine combines two ideas:</p>
-          <ul>
-            <li><strong>Emissions:</strong> how much the latest candle behaviour looks like a bullish, bearish, or choppy market</li>
-            <li><strong>Transitions:</strong> how likely the market is to stay in the same regime or switch into another one</li>
-          </ul>
-          <p>The result is three probabilities. The strongest one becomes the current regime. A signal only becomes tradable when confidence and spread are strong enough.</p>
-
-          <h3>What the new quality score does</h3>
-          <p>v3 adds a simple ML-style ranking layer on top of the HMM. It does not retrain a model yet, but it scores each signal using:</p>
-          <ul>
-            <li>current HMM confidence</li>
-            <li>bull vs bear spread</li>
-            <li>recent paper-trade performance</li>
-            <li>chop penalty</li>
-          </ul>
-          <p>This creates a signal quality score out of 100. Better signals rise to the top of the watchlist.</p>
-
-          <h3>How adaptive thresholds work</h3>
-          <p>The app also adjusts the confidence threshold slightly based on recent paper-trade returns. If recent trading has gone well, the threshold loosens a bit. If recent trading has gone badly, the threshold tightens so the app becomes more selective.</p>
-
-          <h3>How machine learning could improve this later</h3>
-          <p>A fuller machine learning layer could learn which combinations of pair, timeframe, volatility, and time of day tend to work best. That could improve pair ranking, signal acceptance, and filtering of false breakouts.</p>
-          <p class='muted'>This build gives you the groundwork and explanation in-app, while staying honest about what is currently live.</p>
-
-          <h3>How performance is shown</h3>
-          <p>The overview shows realised paper-trade returns over the last 1 day and 7 days, so you can quickly judge whether the app has been effective recently.</p>
-        </div>
+      <div class="panel hidden" id="marketsPanel"><div class="list" id="marketsList"></div></div>
+      <div class="panel hidden" id="signalsPanel"><div class="list" id="signalsList"></div></div>
+      <div class="panel hidden" id="tradesPanel"><div class="list" id="tradesList"></div></div>
+      <div class="panel hidden explain" id="howPanel">
+        <h3>v5 architecture</h3>
+        <p>The trading engine no longer lives in your browser. Northflank runs the scheduled worker, Postgres stores the state, and this Vercel app only reads the results.</p>
+        <p>That makes this the first version in the Set & Forget line that is properly suited to a week-long unattended paper-trading test.</p>
       </div>
     </section>
   </div>
 
-  <script type='module' src='./app.js'></script>
+  <script type="module" src="./app.js"></script>
 </body>
 </html>

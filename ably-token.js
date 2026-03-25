@@ -1,25 +1,21 @@
-const Ably = require('ably');
+import Ably from 'ably';
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   try {
     const apiKey = process.env.ABLY_API_KEY;
     if (!apiKey) {
-      return res.status(200).json({ enabled: false });
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      return res.end(JSON.stringify({ enabled: false }));
     }
-
     const client = new Ably.Rest(apiKey);
-    const tokenRequest = await client.auth.createTokenRequest({
-      clientId: 'set-forget-client'
-    });
-
-    res.status(200).json({
-      enabled: true,
-      tokenRequest
-    });
+    const tokenRequest = await client.auth.createTokenRequest({ clientId: 'set-forget-client' });
+    res.statusCode = 200;
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify({ enabled: true, tokenRequest }));
   } catch (error) {
-    res.status(500).json({
-      enabled: false,
-      error: error.message || 'Token request failed'
-    });
+    res.statusCode = 500;
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify({ enabled: false, error: error.message || 'Token request failed' }));
   }
-};
+}

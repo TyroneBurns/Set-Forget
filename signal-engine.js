@@ -45,13 +45,9 @@ export function atr(candles, length) {
       Math.abs(c.low - prevClose)
     );
   });
-
   const out = [];
   for (let i = 0; i < trs.length; i++) {
-    if (i < length - 1) {
-      out.push(null);
-      continue;
-    }
+    if (i < length - 1) { out.push(null); continue; }
     const slice = trs.slice(i - length + 1, i + 1);
     out.push(slice.reduce((a, b) => a + b, 0) / length);
   }
@@ -59,8 +55,8 @@ export function atr(candles, length) {
 }
 
 function pdf(x, mu, sigma) {
-  const safeSigma = sigma <= 0 ? 1e-6 : sigma;
-  const variance = safeSigma * safeSigma;
+  const s = sigma <= 0 ? 1e-6 : sigma;
+  const variance = s * s;
   return (1 / Math.sqrt(2 * Math.PI * variance)) * Math.exp(-((x - mu) ** 2) / (2 * variance));
 }
 
@@ -71,15 +67,7 @@ export function runHmmRegime(candles, opts = {}) {
   const pStayChop = opts.pStayChop ?? 0.6;
 
   if (!candles || candles.length < length * 3) {
-    return {
-      state: 'NO TRADE',
-      bull: 0,
-      bear: 0,
-      chop: 0,
-      confidence: 0,
-      spread: 0,
-      reason: 'Not enough data'
-    };
+    return { state:'NO TRADE', bull:0, bear:0, chop:0, confidence:0, spread:0, reason:'Not enough data' };
   }
 
   const closes = candles.map((c) => c.close);
@@ -87,16 +75,12 @@ export function runHmmRegime(candles, opts = {}) {
   const momSmooth = ema(momRaw, length);
   const momMean = sma(momSmooth, length);
   const momStd = stdev(momSmooth, length);
-
   const volRaw = atr(candles, length);
   const volSeries = volRaw.map((v) => v ?? 0);
   const volMean = sma(volSeries, length);
   const volStd = stdev(volSeries, length);
 
-  let probBull = 1 / 3;
-  let probBear = 1 / 3;
-  let probChop = 1 / 3;
-
+  let probBull = 1/3, probBear = 1/3, probChop = 1/3;
   const transBullBear = (1 - pStayBull) * 0.2;
   const transBullChop = (1 - pStayBull) * 0.8;
   const transBearBull = (1 - pStayBear) * 0.2;
@@ -105,14 +89,7 @@ export function runHmmRegime(candles, opts = {}) {
   const transChopBear = (1 - pStayChop) * 0.5;
 
   for (let i = 0; i < candles.length; i++) {
-    if (
-      momMean[i] == null ||
-      momStd[i] == null ||
-      volRaw[i] == null ||
-      volMean[i] == null ||
-      volStd[i] == null
-    ) continue;
-
+    if (momMean[i] == null || momStd[i] == null || volRaw[i] == null || volMean[i] == null || volStd[i] == null) continue;
     const obsMom = momStd[i] !== 0 ? (momSmooth[i] - momMean[i]) / momStd[i] : 0;
     const obsVol = volStd[i] !== 0 ? ((volRaw[i] ?? 0) - volMean[i]) / volStd[i] : 0;
 
@@ -120,9 +97,9 @@ export function runHmmRegime(candles, opts = {}) {
     const likeBear = pdf(obsMom, -1.0, 1.0) * pdf(obsVol, 1.0, 1.0);
     const likeChop = pdf(obsMom, 0.0, 0.5) * pdf(obsVol, 1.5, 1.0);
 
-    const priorBull = (probBull * pStayBull) + (probBear * transBearBull) + (probChop * transChopBull);
-    const priorBear = (probBull * transBullBear) + (probBear * pStayBear) + (probChop * transChopBear);
-    const priorChop = (probBull * transBullChop) + (probBear * transBearChop) + (probChop * pStayChop);
+    const priorBull = probBull * pStayBull + probBear * transBearBull + probChop * transChopBull;
+    const priorBear = probBull * transBullBear + probBear * pStayBear + probChop * transChopBear;
+    const priorChop = probBull * transBullChop + probBear * transBearChop + probChop * pStayChop;
 
     const postBull = priorBull * likeBull;
     const postBear = priorBear * likeBear;
@@ -139,15 +116,12 @@ export function runHmmRegime(candles, opts = {}) {
   const bull = +(probBull * 100).toFixed(1);
   const bear = +(probBear * 100).toFixed(1);
   const chop = +(probChop * 100).toFixed(1);
-
   let state = 'NO TRADE';
   if (bull > bear && bull > chop) state = 'LONG';
   else if (bear > bull && bear > chop) state = 'SHORT';
-
   const confidence = Math.max(bull, bear, chop);
   const spread = +(Math.abs(bull - bear)).toFixed(1);
-
-  return { state, bull, bear, chop, confidence, spread, reason: 'OK' };
+  return { state, bull, bear, chop, confidence, spread, reason:'OK' };
 }
 
 export function computeSignalQuality(signal, meta = {}) {
@@ -155,7 +129,6 @@ export function computeSignalQuality(signal, meta = {}) {
   const spreadComponent = Math.min(100, (signal.spread || 0) * 3);
   const recentEdgeComponent = Math.max(0, Math.min(100, 50 + (meta.recentReturnPct || 0) * 8));
   const noisePenalty = Math.max(0, (signal.chop || 0) - 35);
-
   const raw = confidenceComponent * 0.45 + spreadComponent * 0.30 + recentEdgeComponent * 0.25 - noisePenalty * 0.25;
   return Math.max(0, Math.min(100, +raw.toFixed(1)));
 }
@@ -164,32 +137,18 @@ export function getAdaptiveThreshold(meta = {}) {
   const base = meta.baseThreshold ?? 65;
   const recent = meta.recentReturnPct ?? 0;
   const tradeCount = meta.recentTradeCount ?? 0;
-
   let threshold = base;
   if (tradeCount >= 3 && recent > 1.5) threshold -= 4;
   if (tradeCount >= 3 && recent < -1.5) threshold += 5;
   if (tradeCount < 3) threshold += 2;
-
   return Math.max(55, Math.min(85, threshold));
 }
 
-export function getTradeDecision(signal, meta = {}) {
+export function enrichSignal(signal, meta = {}) {
   const adaptiveThreshold = getAdaptiveThreshold(meta);
   const quality = computeSignalQuality(signal, meta);
-
-  if (
-    signal.state === 'LONG' &&
-    signal.confidence >= adaptiveThreshold &&
-    signal.bull - signal.bear >= 15 &&
-    quality >= 60
-  ) return { decision: 'BUY', adaptiveThreshold, quality };
-
-  if (
-    signal.state === 'SHORT' &&
-    signal.confidence >= adaptiveThreshold &&
-    signal.bear - signal.bull >= 15 &&
-    quality >= 60
-  ) return { decision: 'SELL', adaptiveThreshold, quality };
-
-  return { decision: 'HOLD', adaptiveThreshold, quality };
+  let decision = 'HOLD';
+  if (signal.state === 'LONG' && signal.confidence >= adaptiveThreshold && signal.bull - signal.bear >= 15 && quality >= 60) decision = 'BUY';
+  if (signal.state === 'SHORT' && signal.confidence >= adaptiveThreshold && signal.bear - signal.bull >= 15 && quality >= 60) decision = 'SELL';
+  return { ...signal, quality, adaptiveThreshold, decision };
 }

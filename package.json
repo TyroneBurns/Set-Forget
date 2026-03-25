@@ -1,9 +1,15 @@
 {
-  "name": "set-and-forget",
-  "version": "3.2.0",
+  "name": "set-and-forget-v5",
+  "version": "5.0.0",
   "private": true,
-  "description": "Set & Forget with candle HMM, Ably realtime, signal quality scoring, and adaptive thresholds",
+  "description": "Set & Forget v5 with Northflank Postgres worker + Vercel frontend",
+  "type": "module",
+  "scripts": {
+    "worker:once": "node worker/engine.js",
+    "dev:local-note": "echo Run frontend on Vercel or any static server, and worker with npm run worker:once"
+  },
   "dependencies": {
-    "ably": "^2.8.0"
+    "ably": "^2.8.0",
+    "pg": "^8.12.0"
   }
 }
