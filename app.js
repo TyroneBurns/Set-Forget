@@ -4,7 +4,7 @@ const el = {
   equityStat:q('#equityStat'), cashStat:q('#cashStat'), openPnlStat:q('#openPnlStat'), exposureStat:q('#exposureStat'),
   realisedStat:q('#realisedStat'), positionStat:q('#positionStat'), dayReturnStat:q('#dayReturnStat'), weekReturnStat:q('#weekReturnStat'),
   winRateStat:q('#winRateStat'), tradeCountStat:q('#tradeCountStat'), marketsList:q('#marketsList'), signalsList:q('#signalsList'),
-  tradesList:q('#tradesList'), livePositionsList:q('#livePositionsList'), liveCount:q('#liveCount'), nextRunPill:q('#nextRunPill'),
+  livePositionsList:q('#livePositionsList'), liveCount:q('#liveCount'), nextRunPill:q('#nextRunPill'),
   equityHeadline:q('#equityHeadline'), equityMeta:q('#equityMeta'), equityCanvas:q('#equityCanvas'),
   settingsToggle:q('#settingsToggle'), settingsPanel:q('#settingsPanel'), settingsClose:q('#settingsClose'), settingsSave:q('#settingsSave'), saveNote:q('#saveNote'),
   marketDataSource:q('#marketDataSource'), symbols:q('#symbols'), interval:q('#interval'), refreshSeconds:q('#refreshSeconds'),
@@ -14,7 +14,9 @@ const el = {
   maxOpenPositions:q('#maxOpenPositions'), maxCorrelatedPositions:q('#maxCorrelatedPositions'), sizingMode:q('#sizingMode'),
   autoOptimise:q('#autoOptimise'), autoRiskAdjust:q('#autoRiskAdjust'), autoThresholdAdjust:q('#autoThresholdAdjust'),
   optimiserLookbackDays:q('#optimiserLookbackDays'), optimiserTitle:q('#optimiserTitle'), optimiserSummary:q('#optimiserSummary'),
-  effectiveConfidenceStat:q('#effectiveConfidenceStat'), effectiveRiskStat:q('#effectiveRiskStat'), effectiveRiskPill:q('#effectiveRiskPill')
+  effectiveConfidenceStat:q('#effectiveConfidenceStat'), effectiveRiskStat:q('#effectiveRiskStat'), effectiveRiskPill:q('#effectiveRiskPill'),
+  closedTodayStat:q('#closedTodayStat'), winsTodayStat:q('#winsTodayStat'), lossesTodayStat:q('#lossesTodayStat'), netTodayStat:q('#netTodayStat'),
+  tradeOpenList:q('#tradeOpenList'), tradeClosedList:q('#tradeClosedList')
 };
 
 let nextRunSeconds = 300;
@@ -162,7 +164,7 @@ async function refreshAll() {
     renderEffectiveConfig(state.effectiveConfig || state.config || {}, state.config || {});
     renderState(state);
     renderMarkets(state.readyMarkets || markets, state.openPositions || []);
-    renderTrades(state.trades || []);
+    renderTrades(state.trades || [], state.openPositions || [], state.tradeSummary || {});
     renderSignals(signals);
     renderEquityChart(state.equityHistory || [], state.metrics || {});
   } catch {
@@ -250,58 +252,144 @@ function renderMarkets(rows, openPositions) {
     const card = document.createElement('div');
     card.className = 'trade-card';
     card.innerHTML = `
-      <div class="top">
-        <div>
-          <div class="name">${m.pair}</div>
-          <div class="meta">${m.timeframe} • ${m.last_price ? fmtNum(m.last_price) : '–'}</div>
+      <div class="trade-topline">
+        <div class="trade-main">
+          <div class="trade-headline">${m.pair}</div>
+          <div class="trade-subline">${m.timeframe} • ${m.last_price ? fmtNum(m.last_price) : '–'}</div>
         </div>
         <div class="pill ${cls}">${status}</div>
       </div>
-      <div class="bottom">
+      <div class="trade-results">
         <div class="small">Quality ${fmtNum(m.quality_score)} • Conf ${fmtNum(m.confidence_pct)}%</div>
-        <div class="rhs">
-          <div class="name" style="font-size:15px">${m.state}</div>
-          <div class="action">${m.decision}</div>
-        </div>
+        <div class="trade-type-pill">${m.decision}</div>
       </div>
     `;
     el.marketsList.appendChild(card);
   });
 }
 
-function renderTrades(rows) {
-  el.tradesList.innerHTML = '';
-  rows.slice(0, 50).forEach((t) => {
+function tradeReasonClass(reason = '') {
+  const r = String(reason).toLowerCase();
+  if (r.includes('take_profit') || r === 'tp') return 'tp';
+  if (r.includes('stop_loss') || r === 'sl') return 'sl';
+  if (r.includes('signal_flip')) return 'flip';
+  if (r.includes('chop')) return 'chop';
+  return '';
+}
+
+function tradeReasonLabel(reason = '', type = '') {
+  if (type === 'OPEN') return 'OPEN';
+  const r = String(reason).toLowerCase();
+  if (r.includes('take_profit') || r === 'tp') return 'TP';
+  if (r.includes('stop_loss') || r === 'sl') return 'SL';
+  if (r.includes('signal_flip')) return 'SIGNAL FLIP';
+  if (r.includes('chop')) return 'CHOP EXIT';
+  return reason ? String(reason).replaceAll('_', ' ').toUpperCase() : type;
+}
+
+function renderTrades(rows, openPositions, summary) {
+  el.tradeOpenList.innerHTML = '';
+  el.tradeClosedList.innerHTML = '';
+
+  el.closedTodayStat.textContent = String(summary.closedToday || 0);
+  el.winsTodayStat.textContent = String(summary.winsToday || 0);
+  el.lossesTodayStat.textContent = String(summary.lossesToday || 0);
+  el.netTodayStat.textContent = gbp(summary.netRealisedToday || 0);
+  setGoodBad(el.netTodayStat, summary.netRealisedToday || 0);
+
+  const openCards = openPositions || [];
+  if (!openCards.length) {
+    const empty = document.createElement('div');
+    empty.className = 'trade-card';
+    empty.innerHTML = `<div class="small">No open trades right now.</div>`;
+    el.tradeOpenList.appendChild(empty);
+  } else {
+    openCards.forEach((p) => {
+      const item = document.createElement('div');
+      item.className = 'trade-card';
+      item.innerHTML = `
+        <div class="trade-topline">
+          <div class="trade-left">
+            <div class="trade-icon open">↗</div>
+            <div class="trade-main">
+              <div class="trade-headline">${p.side} ${p.pair}</div>
+              <div class="trade-subline">${new Date(p.opened_at).toLocaleString()} • ${fmtDuration(p.duration_minutes || 0)}</div>
+              <div class="trade-subline">Why opened: ${p.opened_reason || 'Signal entry'}</div>
+            </div>
+          </div>
+          <div class="trade-stamp">${p.last_price ? fmtNum(p.last_price) : fmtNum(p.entry_price)}</div>
+        </div>
+        <div class="trade-results">
+          <div>
+            <div class="trade-pnl-wrap">
+              <div class="trade-pnl ${Number(p.open_pnl_gbp || 0) >= 0 ? 'good' : 'bad'}">${gbp(p.open_pnl_gbp || 0)}</div>
+              <div class="trade-pct ${Number(p.open_pnl_gbp || 0) >= 0 ? 'good' : 'bad'}">${fmtPct(p.open_pnl_pct || 0)}</div>
+            </div>
+            <div class="trade-subline">Open trade</div>
+          </div>
+          <div class="trade-type-pill">${p.signal_decision || 'LIVE'}</div>
+        </div>
+        <div class="trade-details">
+          <div class="trade-detail"><div class="k">Size</div><div class="v">${gbp(p.notional_gbp || 0)}</div></div>
+          <div class="trade-detail"><div class="k">Entry</div><div class="v">${fmtNum(p.entry_price)}</div></div>
+          <div class="trade-detail"><div class="k">Last</div><div class="v">${p.last_price ? fmtNum(p.last_price) : '–'}</div></div>
+          <div class="trade-detail"><div class="k">Exit plan</div><div class="v">${p.next_action || 'Hold'}</div></div>
+        </div>
+      `;
+      el.tradeOpenList.appendChild(item);
+    });
+  }
+
+  const closed = rows.filter(t => t.type === 'CLOSE');
+  if (!closed.length) {
+    const empty = document.createElement('div');
+    empty.className = 'trade-card';
+    empty.innerHTML = `<div class="small">No closed trades yet.</div>`;
+    el.tradeClosedList.appendChild(empty);
+    return;
+  }
+
+  closed.forEach((t) => {
     const pnl = Number(t.pnl_gbp || 0);
-    const pnlClass = pnl >= 0 ? 'good' : 'bad';
-    const pct = Number(t.notional_gbp || 0) && t.pnl_gbp != null ? (Number(t.pnl_gbp) / Number(t.notional_gbp)) * 100 : null;
-    const duration = t.opened_at ? fmtDuration(calcDurationMinutes(t.opened_at, t.closed_at || t.created_at)) : '–';
+    const pct = Number(t.notional_gbp || 0) && t.pnl_gbp != null ? (Number(t.pnl_gbp) / Number(t.notional_gbp)) * 100 : 0;
+    const isWin = pnl >= 0;
     const item = document.createElement('div');
-    item.className = 'trade-card';
+    item.className = `trade-card ${isWin ? 'trade-win' : 'trade-loss'}`;
+    const reasonClass = tradeReasonClass(t.reason, t.type);
+    const reasonLabel = tradeReasonLabel(t.reason, t.type);
+
     item.innerHTML = `
-      <div class="top">
-        <div>
-          <div class="name">${t.type} ${t.side}</div>
-          <div class="meta">${t.pair} • ${t.source} • ${new Date(t.created_at).toLocaleString()}${t.reason ? ` • ${t.reason}` : ''}</div>
+      <div class="trade-topline">
+        <div class="trade-left">
+          <div class="trade-icon ${isWin ? 'win' : 'loss'}">${isWin ? '↗' : '↘'}</div>
+          <div class="trade-main">
+            <div class="trade-headline">${t.side} ${t.pair}</div>
+            <div class="trade-subline">${new Date(t.created_at).toLocaleString()}</div>
+            <div class="trade-subline">${reasonLabel}</div>
+          </div>
         </div>
-        <div class="pill">${t.exit_price ? fmtNum(t.exit_price) : fmtNum(t.entry_price)}</div>
+        <div class="trade-stamp">${fmtNum(t.exit_price || t.entry_price)}</div>
       </div>
-      <div class="small" style="margin-top:8px">Lifecycle: ${t.opened_at ? 'Opened ' + new Date(t.opened_at).toLocaleString() : ''}${t.closed_at ? ' • Closed ' + new Date(t.closed_at).toLocaleString() : ''}</div>
-      <div class="small" style="margin-top:4px">Why: conf ${fmtNum(t.confidence_pct || 0)}% • quality ${fmtNum(t.quality_score || 0)} • threshold ${fmtNum(t.adaptive_threshold || 0)}</div>
-      <div class="bottom">
-        <div class="small">
-          ${gbp(t.notional_gbp || 0)}
-          ${t.entry_price ? ` • Entry ${fmtNum(t.entry_price)}` : ''}
-          ${t.exit_price ? ` • Exit ${fmtNum(t.exit_price)}` : ''}
-          • ${duration}
+
+      <div class="trade-results">
+        <div>
+          <div class="trade-pnl-wrap">
+            <div class="trade-pnl ${isWin ? 'good' : 'bad'}">${gbp(pnl)}</div>
+            <div class="trade-pct ${isWin ? 'good' : 'bad'}">${fmtPct(pct)}</div>
+          </div>
+          <div class="trade-subline">${isWin ? 'Closed in profit' : 'Closed in loss'}</div>
         </div>
-        <div class="rhs">
-          <div class="name ${pnlClass}" style="font-size:15px">${t.pnl_gbp != null ? gbp(t.pnl_gbp) : 'Open'}</div>
-          <div class="action">${pct != null ? fmtPct(pct) : t.type}</div>
-        </div>
+        <div class="pill ${reasonClass}">${reasonLabel}</div>
+      </div>
+
+      <div class="trade-details">
+        <div class="trade-detail"><div class="k">Size</div><div class="v">${gbp(t.notional_gbp || 0)}</div></div>
+        <div class="trade-detail"><div class="k">Duration</div><div class="v">${fmtDuration(calcDurationMinutes(t.opened_at, t.closed_at || t.created_at))}</div></div>
+        <div class="trade-detail"><div class="k">Entry</div><div class="v">${t.entry_price ? fmtNum(t.entry_price) : '–'}</div></div>
+        <div class="trade-detail"><div class="k">Exit</div><div class="v">${t.exit_price ? fmtNum(t.exit_price) : '–'}</div></div>
       </div>
     `;
-    el.tradesList.appendChild(item);
+    el.tradeClosedList.appendChild(item);
   });
 }
 
@@ -311,19 +399,16 @@ function renderSignals(rows) {
     const item = document.createElement('div');
     item.className = 'trade-card';
     item.innerHTML = `
-      <div class="top">
-        <div>
-          <div class="name">${s.pair}</div>
-          <div class="meta">${new Date(s.created_at).toLocaleString()}</div>
+      <div class="trade-topline">
+        <div class="trade-main">
+          <div class="trade-headline">${s.pair}</div>
+          <div class="trade-subline">${new Date(s.created_at).toLocaleString()}</div>
         </div>
         <div class="pill">${s.state}</div>
       </div>
-      <div class="bottom">
+      <div class="trade-results">
         <div class="small">Q ${fmtNum(s.quality_score)} • Thr ${fmtNum(s.adaptive_threshold)} • Bull ${fmtNum(s.bull_pct)}%</div>
-        <div class="rhs">
-          <div class="name" style="font-size:15px">${s.decision}</div>
-          <div class="action">${s.timeframe}</div>
-        </div>
+        <div class="trade-type-pill">${s.decision}</div>
       </div>
     `;
     el.signalsList.appendChild(item);
@@ -402,7 +487,7 @@ function fmtDuration(minutes) {
   const mins = Number(minutes || 0);
   const h = Math.floor(mins / 60);
   const m = mins % 60;
-  return h <= 0 ? `${m}m live` : `${h}h ${m}m live`;
+  return h <= 0 ? `${m}m` : `${h}h ${m}m`;
 }
 
 function setGoodBad(node, value) {

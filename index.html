@@ -151,7 +151,33 @@
 
       <div class="panel hidden" id="marketsPanel"><div class="list" id="marketsList"></div></div>
       <div class="panel hidden" id="signalsPanel"><div class="list" id="signalsList"></div></div>
-      <div class="panel hidden" id="tradesPanel"><div class="list" id="tradesList"></div></div>
+
+      <div class="panel hidden" id="tradesPanel">
+        <div class="trade-summary-grid">
+          <div class="summary-pill">
+            <div class="small">Closed today</div>
+            <div class="big" id="closedTodayStat">0</div>
+          </div>
+          <div class="summary-pill">
+            <div class="small">Winners today</div>
+            <div class="big good" id="winsTodayStat">0</div>
+          </div>
+          <div class="summary-pill">
+            <div class="small">Losers today</div>
+            <div class="big bad" id="lossesTodayStat">0</div>
+          </div>
+          <div class="summary-pill">
+            <div class="small">Net realised today</div>
+            <div class="big" id="netTodayStat">£0.00</div>
+          </div>
+        </div>
+
+        <div class="section-title">Open now</div>
+        <div class="list" id="tradeOpenList"></div>
+
+        <div class="section-title">Recently closed</div>
+        <div class="list" id="tradeClosedList"></div>
+      </div>
     </section>
   </div>
 

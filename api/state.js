@@ -7,13 +7,21 @@ function calcDurationMinutes(startIso, endIso = null) {
   return Math.max(0, Math.round((end - start) / 60000));
 }
 
+function sameDay(a, b = new Date()) {
+  const da = new Date(a);
+  const db = new Date(b);
+  return da.getFullYear() === db.getFullYear() &&
+    da.getMonth() === db.getMonth() &&
+    da.getDate() === db.getDate();
+}
+
 export default async function handler(req, res) {
   try {
     const portfolioRows = await query(`select * from sf_portfolio where id = 'main' limit 1`);
     const openRows = await query(`select * from sf_positions where portfolio_id = 'main' and status = 'open' order by opened_at desc`);
     const marketRows = await query(`select * from sf_markets order by quality_score desc, updated_at desc`);
     const snapshotRows = await query(`select * from sf_snapshots where portfolio_id = 'main' order by snapshot_at asc limit 300`);
-    const tradeRows = await query(`select * from sf_trades where portfolio_id = 'main' order by created_at desc limit 100`);
+    const tradeRows = await query(`select * from sf_trades where portfolio_id = 'main' order by created_at desc limit 120`);
     const configRows = await query(`select value from sf_app_config where key = 'settings' limit 1`);
     const effectiveRows = await query(`select value from sf_app_config where key = 'effective_settings' limit 1`);
     const optimiserRows = await query(`select * from sf_optimizer_events where portfolio_id = 'main' order by changed_at desc limit 20`);
@@ -90,6 +98,11 @@ export default async function handler(req, res) {
       equity: Number(s.equity_gbp || 0)
     }));
 
+    const closedToday = closed.filter(t => sameDay(t.closed_at || t.created_at));
+    const winsToday = closedToday.filter(t => Number(t.pnl_gbp || 0) > 0);
+    const lossesToday = closedToday.filter(t => Number(t.pnl_gbp || 0) < 0);
+    const netRealisedToday = closedToday.reduce((sum, t) => sum + Number(t.pnl_gbp || 0), 0);
+
     res.statusCode = 200;
     res.setHeader('content-type', 'application/json');
     res.end(JSON.stringify({
@@ -102,6 +115,12 @@ export default async function handler(req, res) {
       readyMarkets,
       equityHistory,
       trades,
+      tradeSummary: {
+        closedToday: closedToday.length,
+        winsToday: winsToday.length,
+        lossesToday: lossesToday.length,
+        netRealisedToday
+      },
       metrics: {
         currentEquity,
         exposure,
