@@ -47,9 +47,7 @@ export default async function handler(req, res) {
             : (Number(pos.entry_price) - lp) * Number(pos.units))
         : 0;
       const pct = Number(pos.notional_gbp || 0) ? (pnl / Number(pos.notional_gbp)) * 100 : 0;
-      const nextAction = pos.side === 'BUY'
-        ? `Stop ${Number(pos.stop_loss_price || 0).toLocaleString(undefined,{maximumFractionDigits:2})} / TP ${Number(pos.take_profit_price || 0).toLocaleString(undefined,{maximumFractionDigits:2})}`
-        : `Stop ${Number(pos.stop_loss_price || 0).toLocaleString(undefined,{maximumFractionDigits:2})} / TP ${Number(pos.take_profit_price || 0).toLocaleString(undefined,{maximumFractionDigits:2})}`;
+      const nextAction = `Stop ${Number(pos.stop_loss_price || 0).toLocaleString(undefined,{maximumFractionDigits:2})} / TP ${Number(pos.take_profit_price || 0).toLocaleString(undefined,{maximumFractionDigits:2})}`;
 
       return {
         ...pos,

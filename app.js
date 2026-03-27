@@ -1,5 +1,4 @@
 const el = {
-  appName:q('#appName'),
   heroStatus:q('#heroStatus'),
   pairBig:q('#pairBig'),
   stateBadge:q('#stateBadge'),
@@ -98,7 +97,6 @@ function bindSettings() {
 async function loadConfig() {
   const res = await fetch('/api/config');
   const payload = await res.json();
-  el.appName.textContent = payload.appName || 'Set & Forget';
   fillConfig(payload.config || {});
   renderEffectiveConfig(payload.effectiveConfig || payload.config || {}, payload.config || {});
   nextRunSeconds = Number((payload.effectiveConfig || payload.config || {}).refreshSeconds || 300);
@@ -468,7 +466,7 @@ function renderEquityChart(history, metrics) {
   const canvas = el.equityCanvas;
   const dpr = window.devicePixelRatio || 1;
   const width = canvas.clientWidth || 440;
-  const height = 180;
+  const height = 170;
   canvas.width = width * dpr;
   canvas.height = height * dpr;
   const ctx = canvas.getContext('2d');
@@ -483,7 +481,7 @@ function renderEquityChart(history, metrics) {
   const left = 12, right = width - 12, top = 12, bottom = height - 16;
   const chartW = right - left, chartH = bottom - top;
 
-  ctx.strokeStyle = 'rgba(116,241,248,0.08)';
+  ctx.strokeStyle = 'rgba(110,227,232,0.08)';
   ctx.lineWidth = 1;
   for (let i = 0; i < 4; i++) {
     const y = top + (chartH / 3) * i;
@@ -496,8 +494,8 @@ function renderEquityChart(history, metrics) {
   }));
 
   const grad = ctx.createLinearGradient(0, top, 0, bottom);
-  grad.addColorStop(0, 'rgba(116,241,248,0.22)');
-  grad.addColorStop(1, 'rgba(116,241,248,0.01)');
+  grad.addColorStop(0, 'rgba(110,227,232,0.18)');
+  grad.addColorStop(1, 'rgba(110,227,232,0.01)');
 
   ctx.beginPath();
   coords.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
@@ -509,20 +507,20 @@ function renderEquityChart(history, metrics) {
 
   ctx.beginPath();
   coords.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-  ctx.strokeStyle = '#7af5fb';
+  ctx.strokeStyle = '#6ee3e8';
   ctx.lineWidth = 2.5;
   ctx.stroke();
 
   const last = coords[coords.length - 1];
   ctx.beginPath();
   ctx.arc(last.x, last.y, 4, 0, Math.PI * 2);
-  ctx.fillStyle = '#d9feff';
+  ctx.fillStyle = '#e7fdff';
   ctx.fill();
 
   el.equityHeadline.textContent = gbp(metrics.currentEquity || 0);
   el.equityMeta.textContent = history.length
     ? `${history.length} snapshots • 1 day ${fmtPct(metrics.dayReturnPct || 0)} • 7 day ${fmtPct(metrics.weekReturnPct || 0)}`
-    : 'Waiting for more history';
+    : 'Waiting for history';
 }
 
 function calcDurationMinutes(startIso, endIso = null) {
