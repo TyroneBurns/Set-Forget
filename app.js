@@ -1,69 +1,22 @@
 const el = {
-  heroStatus:q('#heroStatus'),
-  pairBig:q('#pairBig'),
-  stateBadge:q('#stateBadge'),
-  lastPrice:q('#lastPrice'),
-  statusText:q('#statusText'),
-  bullPct:q('#bullPct'),
-  bearPct:q('#bearPct'),
-  chopPct:q('#chopPct'),
-  qualityValue:q('#qualityValue'),
-  adaptiveValue:q('#adaptiveValue'),
-  equityStat:q('#equityStat'),
-  cashStat:q('#cashStat'),
-  openPnlStat:q('#openPnlStat'),
-  exposureStat:q('#exposureStat'),
-  realisedStat:q('#realisedStat'),
-  positionStat:q('#positionStat'),
-  dayReturnStat:q('#dayReturnStat'),
-  weekReturnStat:q('#weekReturnStat'),
-  winRateStat:q('#winRateStat'),
-  tradeCountStat:q('#tradeCountStat'),
-  marketsList:q('#marketsList'),
-  signalsList:q('#signalsList'),
-  livePositionsList:q('#livePositionsList'),
-  liveCount:q('#liveCount'),
-  nextRunPill:q('#nextRunPill'),
-  equityHeadline:q('#equityHeadline'),
-  equityMeta:q('#equityMeta'),
-  equityCanvas:q('#equityCanvas'),
-  settingsToggle:q('#settingsToggle'),
-  settingsPanel:q('#settingsPanel'),
-  settingsClose:q('#settingsClose'),
-  settingsSave:q('#settingsSave'),
-  saveNote:q('#saveNote'),
-  marketDataSource:q('#marketDataSource'),
-  symbols:q('#symbols'),
-  interval:q('#interval'),
-  refreshSeconds:q('#refreshSeconds'),
-  lookbackPeriod:q('#lookbackPeriod'),
-  minConfidencePct:q('#minConfidencePct'),
-  pBullBull:q('#pBullBull'),
-  pBearBear:q('#pBearBear'),
-  pChopChop:q('#pChopChop'),
-  startBalance:q('#startBalance'),
-  riskPerTradePct:q('#riskPerTradePct'),
-  stopLossPct:q('#stopLossPct'),
-  takeProfitPct:q('#takeProfitPct'),
-  exitOnChop:q('#exitOnChop'),
-  maxOpenPositions:q('#maxOpenPositions'),
-  maxCorrelatedPositions:q('#maxCorrelatedPositions'),
-  sizingMode:q('#sizingMode'),
-  autoOptimise:q('#autoOptimise'),
-  autoRiskAdjust:q('#autoRiskAdjust'),
-  autoThresholdAdjust:q('#autoThresholdAdjust'),
-  optimiserLookbackDays:q('#optimiserLookbackDays'),
-  optimiserTitle:q('#optimiserTitle'),
-  optimiserSummary:q('#optimiserSummary'),
-  effectiveConfidenceStat:q('#effectiveConfidenceStat'),
-  effectiveRiskStat:q('#effectiveRiskStat'),
-  effectiveRiskPill:q('#effectiveRiskPill'),
-  closedTodayStat:q('#closedTodayStat'),
-  winsTodayStat:q('#winsTodayStat'),
-  lossesTodayStat:q('#lossesTodayStat'),
-  netTodayStat:q('#netTodayStat'),
-  tradeOpenList:q('#tradeOpenList'),
-  tradeClosedList:q('#tradeClosedList')
+  appName:q('#appName'), pairBig:q('#pairBig'), stateBadge:q('#stateBadge'), lastPrice:q('#lastPrice'), statusText:q('#statusText'),
+  bullPct:q('#bullPct'), bearPct:q('#bearPct'), chopPct:q('#chopPct'), qualityValue:q('#qualityValue'), adaptiveValue:q('#adaptiveValue'),
+  equityStat:q('#equityStat'), cashStat:q('#cashStat'), openPnlStat:q('#openPnlStat'), exposureStat:q('#exposureStat'),
+  realisedStat:q('#realisedStat'), positionStat:q('#positionStat'), dayReturnStat:q('#dayReturnStat'), weekReturnStat:q('#weekReturnStat'),
+  winRateStat:q('#winRateStat'), tradeCountStat:q('#tradeCountStat'), marketsList:q('#marketsList'), signalsList:q('#signalsList'),
+  livePositionsList:q('#livePositionsList'), liveCount:q('#liveCount'), nextRunPill:q('#nextRunPill'),
+  equityHeadline:q('#equityHeadline'), equityMeta:q('#equityMeta'), equityCanvas:q('#equityCanvas'),
+  settingsToggle:q('#settingsToggle'), settingsPanel:q('#settingsPanel'), settingsClose:q('#settingsClose'), settingsSave:q('#settingsSave'), saveNote:q('#saveNote'),
+  marketDataSource:q('#marketDataSource'), symbols:q('#symbols'), interval:q('#interval'), refreshSeconds:q('#refreshSeconds'),
+  lookbackPeriod:q('#lookbackPeriod'), minConfidencePct:q('#minConfidencePct'), pBullBull:q('#pBullBull'), pBearBear:q('#pBearBear'),
+  pChopChop:q('#pChopChop'), startBalance:q('#startBalance'), riskPerTradePct:q('#riskPerTradePct'),
+  stopLossPct:q('#stopLossPct'), takeProfitPct:q('#takeProfitPct'), exitOnChop:q('#exitOnChop'),
+  maxOpenPositions:q('#maxOpenPositions'), maxCorrelatedPositions:q('#maxCorrelatedPositions'), sizingMode:q('#sizingMode'),
+  autoOptimise:q('#autoOptimise'), autoRiskAdjust:q('#autoRiskAdjust'), autoThresholdAdjust:q('#autoThresholdAdjust'),
+  optimiserLookbackDays:q('#optimiserLookbackDays'), optimiserTitle:q('#optimiserTitle'), optimiserSummary:q('#optimiserSummary'),
+  effectiveConfidenceStat:q('#effectiveConfidenceStat'), effectiveRiskStat:q('#effectiveRiskStat'), effectiveRiskPill:q('#effectiveRiskPill'),
+  closedTodayStat:q('#closedTodayStat'), winsTodayStat:q('#winsTodayStat'), lossesTodayStat:q('#lossesTodayStat'), netTodayStat:q('#netTodayStat'),
+  tradeOpenList:q('#tradeOpenList'), tradeClosedList:q('#tradeClosedList')
 };
 
 let nextRunSeconds = 300;
@@ -97,6 +50,7 @@ function bindSettings() {
 async function loadConfig() {
   const res = await fetch('/api/config');
   const payload = await res.json();
+  el.appName.textContent = payload.appName || 'Set & Forget';
   fillConfig(payload.config || {});
   renderEffectiveConfig(payload.effectiveConfig || payload.config || {}, payload.config || {});
   nextRunSeconds = Number((payload.effectiveConfig || payload.config || {}).refreshSeconds || 300);
@@ -224,11 +178,10 @@ function renderState(data) {
   const openPositions = data.openPositions || [];
   const metrics = data.metrics || {};
 
-  el.heroStatus.textContent = openPositions.length ? `${openPositions.length} live trade${openPositions.length === 1 ? '' : 's'}` : 'Paper trading live';
   el.pairBig.textContent = market ? `${market.pair} • ${market.timeframe}` : '–';
   el.stateBadge.textContent = market?.state || 'NO DATA';
   el.lastPrice.textContent = market?.last_price ? fmtNum(market.last_price) : '–';
-  el.statusText.textContent = market ? `${market.decision} • Confidence ${fmtNum(market.confidence_pct)}% • Quality ${fmtNum(market.quality_score)}` : 'Waiting for database state…';
+  el.statusText.textContent = market ? `${market.decision} • Confidence ${fmtNum(market.confidence_pct)}% • Quality ${fmtNum(market.quality_score)}` : 'Waiting for worker run';
 
   el.bullPct.textContent = `${fmtNum(market?.bull_pct || 0)}%`;
   el.bearPct.textContent = `${fmtNum(market?.bear_pct || 0)}%`;
@@ -261,7 +214,7 @@ function renderLivePositions(rows) {
   if (!rows.length) {
     const empty = document.createElement('div');
     empty.className = 'banner';
-    empty.innerHTML = `<div class="banner-sub">No live positions yet. The engine will open trades when signal quality is above threshold.</div>`;
+    empty.innerHTML = `<div class="small">No live positions yet. The engine will open trades when signal quality is above threshold.</div>`;
     el.livePositionsList.appendChild(empty);
     return;
   }
@@ -277,8 +230,8 @@ function renderLivePositions(rows) {
         </div>
         <div class="pill trade">LIVE</div>
       </div>
-      <div class="banner-sub">Why opened: ${p.opened_reason || 'Signal entry'}</div>
-      <div class="banner-sub">Exit plan: ${p.next_action || 'Hold until exit signal'}</div>
+      <div class="small" style="margin-top:8px">Why opened: ${p.opened_reason || 'Signal entry'}</div>
+      <div class="small" style="margin-top:4px">Exit plan: ${p.next_action || 'Hold until exit signal'}</div>
       <div class="banner-metrics">
         <div class="metric-box"><div class="m-label">Size</div><div class="m-value">${gbp(p.notional_gbp || 0)}</div></div>
         <div class="metric-box"><div class="m-label">Signal</div><div class="m-value">${p.signal_decision || 'HOLD'}</div></div>
@@ -307,7 +260,7 @@ function renderMarkets(rows, openPositions) {
         <div class="pill ${cls}">${status}</div>
       </div>
       <div class="trade-results">
-        <div class="trade-subline">Quality ${fmtNum(m.quality_score)} • Conf ${fmtNum(m.confidence_pct)}%</div>
+        <div class="small">Quality ${fmtNum(m.quality_score)} • Conf ${fmtNum(m.confidence_pct)}%</div>
         <div class="trade-type-pill">${m.decision}</div>
       </div>
     `;
@@ -348,7 +301,7 @@ function renderTrades(rows, openPositions, summary) {
   if (!openCards.length) {
     const empty = document.createElement('div');
     empty.className = 'trade-card';
-    empty.innerHTML = `<div class="trade-subline">No open trades right now.</div>`;
+    empty.innerHTML = `<div class="small">No open trades right now.</div>`;
     el.tradeOpenList.appendChild(empty);
   } else {
     openCards.forEach((p) => {
@@ -391,7 +344,7 @@ function renderTrades(rows, openPositions, summary) {
   if (!closed.length) {
     const empty = document.createElement('div');
     empty.className = 'trade-card';
-    empty.innerHTML = `<div class="trade-subline">No closed trades yet.</div>`;
+    empty.innerHTML = `<div class="small">No closed trades yet.</div>`;
     el.tradeClosedList.appendChild(empty);
     return;
   }
@@ -454,7 +407,7 @@ function renderSignals(rows) {
         <div class="pill">${s.state}</div>
       </div>
       <div class="trade-results">
-        <div class="trade-subline">Q ${fmtNum(s.quality_score)} • Thr ${fmtNum(s.adaptive_threshold)} • Bull ${fmtNum(s.bull_pct)}%</div>
+        <div class="small">Q ${fmtNum(s.quality_score)} • Thr ${fmtNum(s.adaptive_threshold)} • Bull ${fmtNum(s.bull_pct)}%</div>
         <div class="trade-type-pill">${s.decision}</div>
       </div>
     `;
@@ -478,10 +431,10 @@ function renderEquityChart(history, metrics) {
   const max = Math.max(...points);
   const paddedMin = min === max ? min - 1 : min - (max - min) * 0.12;
   const paddedMax = min === max ? max + 1 : max + (max - min) * 0.12;
-  const left = 12, right = width - 12, top = 12, bottom = height - 16;
+  const left = 10, right = width - 10, top = 10, bottom = height - 16;
   const chartW = right - left, chartH = bottom - top;
 
-  ctx.strokeStyle = 'rgba(110,227,232,0.08)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
   ctx.lineWidth = 1;
   for (let i = 0; i < 4; i++) {
     const y = top + (chartH / 3) * i;
@@ -494,8 +447,8 @@ function renderEquityChart(history, metrics) {
   }));
 
   const grad = ctx.createLinearGradient(0, top, 0, bottom);
-  grad.addColorStop(0, 'rgba(110,227,232,0.18)');
-  grad.addColorStop(1, 'rgba(110,227,232,0.01)');
+  grad.addColorStop(0, 'rgba(125,124,255,0.35)');
+  grad.addColorStop(1, 'rgba(125,124,255,0.02)');
 
   ctx.beginPath();
   coords.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
@@ -507,20 +460,20 @@ function renderEquityChart(history, metrics) {
 
   ctx.beginPath();
   coords.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-  ctx.strokeStyle = '#6ee3e8';
+  ctx.strokeStyle = '#8f88ff';
   ctx.lineWidth = 2.5;
   ctx.stroke();
 
   const last = coords[coords.length - 1];
   ctx.beginPath();
   ctx.arc(last.x, last.y, 4, 0, Math.PI * 2);
-  ctx.fillStyle = '#e7fdff';
+  ctx.fillStyle = '#c8c5ff';
   ctx.fill();
 
   el.equityHeadline.textContent = gbp(metrics.currentEquity || 0);
   el.equityMeta.textContent = history.length
     ? `${history.length} snapshots • 1 day ${fmtPct(metrics.dayReturnPct || 0)} • 7 day ${fmtPct(metrics.weekReturnPct || 0)}`
-    : 'Waiting for history';
+    : 'Waiting for more history';
 }
 
 function calcDurationMinutes(startIso, endIso = null) {
@@ -534,7 +487,7 @@ function fmtDuration(minutes) {
   const mins = Number(minutes || 0);
   const h = Math.floor(mins / 60);
   const m = mins % 60;
-  return h <= 0 ? `${m}m live` : `${h}h ${m}m live`;
+  return h <= 0 ? `${m}m` : `${h}h ${m}m`;
 }
 
 function setGoodBad(node, value) {

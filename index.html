@@ -3,65 +3,51 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>ONYX</title>
-  <meta name="theme-color" content="#05070d">
+  <title>Set & Forget</title>
+  <meta name="theme-color" content="#060816">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <div class="wrap">
     <section class="card hero">
-      <div class="hero-top">
-        <img class="wordmark" src="./assets/onyx-wordmark.png" alt="ONYX">
-        <button class="settings-btn" id="settingsToggle" type="button">⚙️</button>
-      </div>
-
-      <div class="mini-nav">
-        <span class="mini-nav-link active">Dashboard</span>
-        <span class="mini-nav-link">Strategies</span>
-        <span class="mini-nav-link">Performance</span>
-        <span class="mini-nav-link">Risk</span>
-      </div>
-
-      <div class="hero-grid">
-        <div class="info-box">
-          <div class="eyebrow">Algorithmic trading platform</div>
-          <div class="hero-title">Set &amp; Forget</div>
-          <div class="hero-copy">ONYX theme, live paper trading, optimiser controls, multi-position execution, confidence-weighted sizing, and clear trade lifecycle visibility.</div>
+      <div class="head">
+        <div class="logo">SF</div>
+        <div class="hero-copy">
+          <div class="kicker">Profit optimisation mode</div>
+          <div class="title" id="appName">Set & Forget</div>
         </div>
-        <div class="info-box compact">
-          <div class="eyebrow">Status</div>
-          <div class="status-big" id="heroStatus">Paper trading live</div>
-          <div class="status-small">Worker + UI connected</div>
-        </div>
+        <button class="settings-fab" id="settingsToggle" type="button">⚙️</button>
       </div>
+      <div class="notice">Multi-position trading, capped exposure, confidence-weighted sizing, correlation control, and optional self-optimisation with guardrails.</div>
 
       <div class="settings-panel hidden" id="settingsPanel">
-        <div class="settings-grid">
-          <div class="field"><label>Market data source</label><select id="marketDataSource"><option>Binance public candles</option></select></div>
-          <div class="field"><label>Symbols</label><input id="symbols" placeholder="BTCUSDT,ETHUSDT,SOLUSDT"></div>
-          <div class="field"><label>Interval</label><select id="interval"><option>5m</option><option selected>15m</option><option>1h</option><option>4h</option></select></div>
-          <div class="field"><label>Refresh every</label><input id="refreshSeconds" type="number"></div>
-          <div class="field"><label>Lookback period</label><input id="lookbackPeriod" type="number"></div>
-          <div class="field"><label>Min confidence %</label><input id="minConfidencePct" type="number"></div>
-          <div class="field"><label>P(Bull | Bull)</label><input id="pBullBull" type="number" step="0.01"></div>
-          <div class="field"><label>P(Bear | Bear)</label><input id="pBearBear" type="number" step="0.01"></div>
-          <div class="field"><label>P(Chop | Chop)</label><input id="pChopChop" type="number" step="0.01"></div>
-          <div class="field"><label>Start balance</label><input id="startBalance" type="number"></div>
-          <div class="field"><label>Risk per trade %</label><input id="riskPerTradePct" type="number"></div>
-          <div class="field"><label>Stop loss %</label><input id="stopLossPct" type="number" step="0.1"></div>
-          <div class="field"><label>Take profit %</label><input id="takeProfitPct" type="number" step="0.1"></div>
-          <div class="field"><label>Max open positions</label><input id="maxOpenPositions" type="number"></div>
-          <div class="field"><label>Max correlated positions</label><input id="maxCorrelatedPositions" type="number"></div>
-          <div class="field"><label>Sizing mode</label><select id="sizingMode"><option value="fixed">Fixed</option><option value="confidence_weighted">Confidence weighted</option></select></div>
-          <div class="field"><label>Optimiser lookback days</label><input id="optimiserLookbackDays" type="number"></div>
+        <div class="settings-segment">
+          <button class="seg active" type="button">Screen</button>
+          <button class="seg" type="button">Full Page</button>
         </div>
 
-        <div class="toggle-list">
-          <label class="toggle-row"><input id="exitOnChop" type="checkbox"><span>Exit demo trades on chop</span></label>
-          <label class="toggle-row"><input id="autoOptimise" type="checkbox"><span>Auto-optimise controls</span></label>
-          <label class="toggle-row"><input id="autoRiskAdjust" type="checkbox"><span>Auto-adjust risk</span></label>
-          <label class="toggle-row"><input id="autoThresholdAdjust" type="checkbox"><span>Auto-adjust threshold</span></label>
-        </div>
+        <div class="field"><label>Market data source</label><select id="marketDataSource"><option>Binance public candles</option></select></div>
+        <div class="field"><label>Symbols</label><input id="symbols" placeholder="BTCUSDT,ETHUSDT,SOLUSDT"></div>
+        <div class="field"><label>Interval</label><select id="interval"><option>5m</option><option selected>15m</option><option>1h</option><option>4h</option></select></div>
+        <div class="field"><label>Refresh every</label><input id="refreshSeconds" type="number"></div>
+        <div class="field"><label>Lookback period</label><input id="lookbackPeriod" type="number"></div>
+        <div class="field"><label>Min confidence %</label><input id="minConfidencePct" type="number"></div>
+        <div class="field"><label>P(Bull | Bull)</label><input id="pBullBull" type="number" step="0.01"></div>
+        <div class="field"><label>P(Bear | Bear)</label><input id="pBearBear" type="number" step="0.01"></div>
+        <div class="field"><label>P(Chop | Chop)</label><input id="pChopChop" type="number" step="0.01"></div>
+        <div class="field"><label>Start balance</label><input id="startBalance" type="number"></div>
+        <div class="field"><label>Risk per trade %</label><input id="riskPerTradePct" type="number"></div>
+        <div class="field"><label>Stop loss %</label><input id="stopLossPct" type="number" step="0.1"></div>
+        <div class="field"><label>Take profit %</label><input id="takeProfitPct" type="number" step="0.1"></div>
+        <div class="field"><label>Max open positions</label><input id="maxOpenPositions" type="number"></div>
+        <div class="field"><label>Max correlated positions</label><input id="maxCorrelatedPositions" type="number"></div>
+        <div class="field"><label>Sizing mode</label><select id="sizingMode"><option value="fixed">Fixed</option><option value="confidence_weighted">Confidence weighted</option></select></div>
+        <div class="field"><label>Optimiser lookback days</label><input id="optimiserLookbackDays" type="number"></div>
+
+        <label class="toggle-row"><input id="exitOnChop" type="checkbox"><span>Exit demo trades on chop</span></label>
+        <label class="toggle-row"><input id="autoOptimise" type="checkbox"><span>Auto-optimise controls</span></label>
+        <label class="toggle-row"><input id="autoRiskAdjust" type="checkbox"><span>Auto-adjust risk</span></label>
+        <label class="toggle-row"><input id="autoThresholdAdjust" type="checkbox"><span>Auto-adjust threshold</span></label>
 
         <div class="settings-actions">
           <button class="btn ghost" id="settingsClose" type="button">Close</button>
@@ -71,98 +57,73 @@
       </div>
     </section>
 
-    <section class="grid-two">
-      <section class="card">
-        <div class="panel">
-          <div class="panel-header">
-            <div>
-              <div class="eyebrow">Portfolio value</div>
-              <div class="money" id="equityHeadline">£0.00</div>
-            </div>
-            <div class="chip" id="equityMeta">Waiting for history</div>
+    <section class="card">
+      <div class="panel">
+        <div class="row top-row">
+          <div>
+            <div class="kicker">Live trades</div>
+            <div class="title-sm" id="liveCount">0 open trades</div>
           </div>
-          <canvas id="equityCanvas" height="170"></canvas>
+          <div class="pill" id="nextRunPill">Next run 5:00</div>
         </div>
-      </section>
-
-      <section class="card">
-        <div class="panel">
-          <div class="panel-header">
-            <div>
-              <div class="eyebrow">Active trades</div>
-              <div class="section-big" id="liveCount">0 open trades</div>
-            </div>
-            <div class="chip" id="nextRunPill">Next run 5:00</div>
-          </div>
-          <div class="list" id="livePositionsList"></div>
-        </div>
-      </section>
+        <div class="banner-list" id="livePositionsList"></div>
+      </div>
     </section>
 
-    <section class="grid-three">
-      <section class="card">
-        <div class="panel">
-          <div class="panel-header">
-            <div>
-              <div class="eyebrow">Optimiser</div>
-              <div class="section-big" id="optimiserTitle">Manual mode</div>
-            </div>
-            <div class="chip chip-gold" id="effectiveRiskPill">Risk –</div>
+    <section class="card chart-card">
+      <div class="panel">
+        <div class="row">
+          <div>
+            <div class="kicker">Equity curve</div>
+            <div class="title-sm" id="equityHeadline">£0.00</div>
           </div>
-          <div class="info-box slim" id="optimiserSummary">Auto-optimiser is off.</div>
-          <div class="mini-grid">
-            <div class="mini-stat"><div class="mini-label">Effective confidence floor</div><div class="mini-value" id="effectiveConfidenceStat">–</div></div>
-            <div class="mini-stat"><div class="mini-label">Effective risk / trade</div><div class="mini-value" id="effectiveRiskStat">–</div></div>
-          </div>
+          <div class="chart-meta" id="equityMeta">No history yet</div>
         </div>
-      </section>
+        <canvas id="equityCanvas" height="170"></canvas>
+      </div>
+    </section>
 
-      <section class="card">
-        <div class="panel">
-          <div class="panel-header">
-            <div>
-              <div class="eyebrow">Current engine leader</div>
-              <div class="section-big" id="pairBig">–</div>
-            </div>
-            <div class="chip" id="stateBadge">NO DATA</div>
+    <section class="card">
+      <div class="panel">
+        <div class="row">
+          <div>
+            <div class="kicker">Optimiser</div>
+            <div class="title-sm" id="optimiserTitle">Manual mode</div>
           </div>
-          <div class="price-label">Last price</div>
-          <div class="price" id="lastPrice">–</div>
-          <div class="copy-muted" id="statusText">Waiting for database state…</div>
-
-          <div class="prob-grid">
-            <div class="mini-stat"><div class="mini-label">Bull</div><div class="mini-value" id="bullPct">0%</div></div>
-            <div class="mini-stat"><div class="mini-label">Bear</div><div class="mini-value" id="bearPct">0%</div></div>
-            <div class="mini-stat"><div class="mini-label">Chop</div><div class="mini-value" id="chopPct">0%</div></div>
-          </div>
-
-          <div class="mini-grid">
-            <div class="mini-stat"><div class="mini-label">Quality</div><div class="mini-value" id="qualityValue">0</div></div>
-            <div class="mini-stat"><div class="mini-label">Threshold</div><div class="mini-value" id="adaptiveValue">0</div></div>
-          </div>
+          <div class="pill ready" id="effectiveRiskPill">Risk –</div>
         </div>
-      </section>
-
-      <section class="card">
-        <div class="panel">
-          <div class="panel-header">
-            <div>
-              <div class="eyebrow">Risk indicator</div>
-              <div class="section-big">Live profile</div>
-            </div>
-            <img class="icon-mark" src="./assets/onyx-icon.png" alt="ONYX icon">
-          </div>
-
-          <div class="mini-grid">
-            <div class="mini-stat"><div class="mini-label">Current equity</div><div class="mini-value" id="equityStat">£0</div></div>
-            <div class="mini-stat"><div class="mini-label">Cash</div><div class="mini-value" id="cashStat">£0</div></div>
-            <div class="mini-stat"><div class="mini-label">Exposure</div><div class="mini-value" id="exposureStat">£0</div></div>
-            <div class="mini-stat"><div class="mini-label">Open trades</div><div class="mini-value" id="positionStat">0</div></div>
-            <div class="mini-stat"><div class="mini-label">1 day return</div><div class="mini-value" id="dayReturnStat">0%</div></div>
-            <div class="mini-stat"><div class="mini-label">7 day return</div><div class="mini-value" id="weekReturnStat">0%</div></div>
-          </div>
+        <div class="notice slim" id="optimiserSummary">Auto-optimiser is off.</div>
+        <div class="grid-2 tight">
+          <div class="stat smallstat"><div class="small">Effective confidence floor</div><div class="big" id="effectiveConfidenceStat">–</div></div>
+          <div class="stat smallstat"><div class="small">Effective risk / trade</div><div class="big" id="effectiveRiskStat">–</div></div>
         </div>
-      </section>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="live">
+        <div class="live-top">
+          <div>
+            <div class="kicker">Current engine leader</div>
+            <div class="pair-big" id="pairBig">–</div>
+          </div>
+          <div class="badge" id="stateBadge">NO DATA</div>
+        </div>
+        <div class="price-label">Last price</div>
+        <div class="price" id="lastPrice">–</div>
+        <div class="status" id="statusText">Waiting for database state…</div>
+
+        <div class="probs">
+          <div class="prob"><div class="label">Bull</div><div class="value" id="bullPct">0%</div></div>
+          <div class="prob"><div class="label">Bear</div><div class="value" id="bearPct">0%</div></div>
+          <div class="prob"><div class="label">Chop</div><div class="value" id="chopPct">0%</div></div>
+        </div>
+
+        <div class="quality-grid">
+          <div class="mini"><div class="label">Quality</div><div class="value" id="qualityValue">0</div></div>
+          <div class="mini"><div class="label">Threshold</div><div class="value" id="adaptiveValue">0</div></div>
+        </div>
+      </div>
     </section>
 
     <section class="card">
@@ -174,11 +135,17 @@
       </div>
 
       <div class="panel" id="overviewPanel">
-        <div class="dashboard-grid">
-          <div class="dash-stat"><div class="mini-label">Open PnL</div><div class="dash-value" id="openPnlStat">£0</div></div>
-          <div class="dash-stat"><div class="mini-label">Realised PnL</div><div class="dash-value" id="realisedStat">£0</div></div>
-          <div class="dash-stat"><div class="mini-label">Win rate</div><div class="dash-value" id="winRateStat">0%</div></div>
-          <div class="dash-stat"><div class="mini-label">Trades closed</div><div class="dash-value" id="tradeCountStat">0</div></div>
+        <div class="grid-2">
+          <div class="stat"><div class="small">Current equity</div><div class="big" id="equityStat">£0</div></div>
+          <div class="stat"><div class="small">Cash</div><div class="big" id="cashStat">£0</div></div>
+          <div class="stat"><div class="small">Open PnL</div><div class="big" id="openPnlStat">£0</div></div>
+          <div class="stat"><div class="small">Exposure</div><div class="big" id="exposureStat">£0</div></div>
+          <div class="stat"><div class="small">Realised PnL</div><div class="big" id="realisedStat">£0</div></div>
+          <div class="stat"><div class="small">Open trades</div><div class="big" id="positionStat">0</div></div>
+          <div class="stat"><div class="small">1 day return</div><div class="big" id="dayReturnStat">0%</div></div>
+          <div class="stat"><div class="small">7 day return</div><div class="big" id="weekReturnStat">0%</div></div>
+          <div class="stat"><div class="small">Win rate</div><div class="big" id="winRateStat">0%</div></div>
+          <div class="stat"><div class="small">Trades closed</div><div class="big" id="tradeCountStat">0</div></div>
         </div>
       </div>
 
@@ -187,10 +154,22 @@
 
       <div class="panel hidden" id="tradesPanel">
         <div class="trade-summary-grid">
-          <div class="summary-pill"><div class="mini-label">Closed today</div><div class="mini-value" id="closedTodayStat">0</div></div>
-          <div class="summary-pill"><div class="mini-label">Winners today</div><div class="mini-value good" id="winsTodayStat">0</div></div>
-          <div class="summary-pill"><div class="mini-label">Losers today</div><div class="mini-value bad" id="lossesTodayStat">0</div></div>
-          <div class="summary-pill"><div class="mini-label">Net realised today</div><div class="mini-value" id="netTodayStat">£0.00</div></div>
+          <div class="summary-pill">
+            <div class="small">Closed today</div>
+            <div class="big" id="closedTodayStat">0</div>
+          </div>
+          <div class="summary-pill">
+            <div class="small">Winners today</div>
+            <div class="big good" id="winsTodayStat">0</div>
+          </div>
+          <div class="summary-pill">
+            <div class="small">Losers today</div>
+            <div class="big bad" id="lossesTodayStat">0</div>
+          </div>
+          <div class="summary-pill">
+            <div class="small">Net realised today</div>
+            <div class="big" id="netTodayStat">£0.00</div>
+          </div>
         </div>
 
         <div class="section-title">Open now</div>
