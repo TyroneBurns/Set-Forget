@@ -13,7 +13,7 @@ const el = {
   stopLossPct:q('#stopLossPct'), takeProfitPct:q('#takeProfitPct'), exitOnChop:q('#exitOnChop'),
   maxOpenPositions:q('#maxOpenPositions'), maxCorrelatedPositions:q('#maxCorrelatedPositions'), sizingMode:q('#sizingMode'),
   autoOptimise:q('#autoOptimise'), autoRiskAdjust:q('#autoRiskAdjust'), autoThresholdAdjust:q('#autoThresholdAdjust'),
-  optimiserLookbackDays:q('#optimiserLookbackDays'), optimiserTitle:q('#optimiserTitle'), optimiserSummary:q('#optimiserSummary'),
+  optimiserLookbackDays:q('#optimiserLookbackDays'), statePersistenceBars:q('#statePersistenceBars'), flipCooldownBars:q('#flipCooldownBars'), minPosteriorGapPct:q('#minPosteriorGapPct'), secondaryCorrelationScalePct:q('#secondaryCorrelationScalePct'), secondaryEntryMinQuality:q('#secondaryEntryMinQuality'), useTrendFilter:q('#useTrendFilter'), useAtrFilter:q('#useAtrFilter'), useStructureFilter:q('#useStructureFilter'), optimiserTitle:q('#optimiserTitle'), optimiserSummary:q('#optimiserSummary'),
   effectiveConfidenceStat:q('#effectiveConfidenceStat'), effectiveRiskStat:q('#effectiveRiskStat'), effectiveRiskPill:q('#effectiveRiskPill'),
   closedTodayStat:q('#closedTodayStat'), winsTodayStat:q('#winsTodayStat'), lossesTodayStat:q('#lossesTodayStat'), netTodayStat:q('#netTodayStat'),
   tradeOpenList:q('#tradeOpenList'), tradeClosedList:q('#tradeClosedList')
@@ -79,13 +79,21 @@ function fillConfig(cfg) {
   el.autoRiskAdjust.checked = Boolean(cfg.autoRiskAdjust);
   el.autoThresholdAdjust.checked = Boolean(cfg.autoThresholdAdjust);
   el.optimiserLookbackDays.value = cfg.optimiserLookbackDays ?? 7;
+  el.statePersistenceBars.value = cfg.statePersistenceBars ?? 2;
+  el.flipCooldownBars.value = cfg.flipCooldownBars ?? 2;
+  el.minPosteriorGapPct.value = cfg.minPosteriorGapPct ?? 12;
+  el.secondaryCorrelationScalePct.value = cfg.secondaryCorrelationScalePct ?? 40;
+  el.secondaryEntryMinQuality.value = cfg.secondaryEntryMinQuality ?? 88;
+  el.useTrendFilter.checked = Boolean(cfg.useTrendFilter);
+  el.useAtrFilter.checked = Boolean(cfg.useAtrFilter);
+  el.useStructureFilter.checked = Boolean(cfg.useStructureFilter);
 }
 
 function renderEffectiveConfig(effective, userCfg) {
   const autoOn = Boolean(userCfg.autoOptimise);
   el.optimiserTitle.textContent = autoOn ? 'Auto-optimiser on' : 'Manual mode';
   el.optimiserSummary.textContent = autoOn
-    ? `Running with effective threshold ${effective.minConfidencePct}% and risk ${effective.riskPerTradePct}% per trade.`
+    ? `Running with effective threshold ${effective.minConfidencePct}% and risk ${effective.riskPerTradePct}% per trade. Persistence ${effective.statePersistenceBars || 1} bars, gap ${effective.minPosteriorGapPct || 0}%.`
     : 'Auto-optimiser is off. Effective settings match your saved controls.';
   el.effectiveConfidenceStat.textContent = `${Number(effective.minConfidencePct || 0).toFixed(0)}%`;
   el.effectiveRiskStat.textContent = `${Number(effective.riskPerTradePct || 0).toFixed(2)}%`;
@@ -114,7 +122,15 @@ async function saveConfig() {
     autoOptimise: el.autoOptimise.checked,
     autoRiskAdjust: el.autoRiskAdjust.checked,
     autoThresholdAdjust: el.autoThresholdAdjust.checked,
-    optimiserLookbackDays: Number(el.optimiserLookbackDays.value)
+    optimiserLookbackDays: Number(el.optimiserLookbackDays.value),
+    statePersistenceBars: Number(el.statePersistenceBars.value),
+    flipCooldownBars: Number(el.flipCooldownBars.value),
+    minPosteriorGapPct: Number(el.minPosteriorGapPct.value),
+    secondaryCorrelationScalePct: Number(el.secondaryCorrelationScalePct.value),
+    secondaryEntryMinQuality: Number(el.secondaryEntryMinQuality.value),
+    useTrendFilter: el.useTrendFilter.checked,
+    useAtrFilter: el.useAtrFilter.checked,
+    useStructureFilter: el.useStructureFilter.checked
   };
   el.saveNote.textContent = 'Saving...';
   const res = await fetch('/api/config', {

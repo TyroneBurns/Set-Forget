@@ -6,23 +6,31 @@ const DEFAULT_CONFIG = {
   interval: '15m',
   refreshSeconds: 300,
   lookbackPeriod: 20,
-  minConfidencePct: 68,
-  pBullBull: 0.8,
-  pBearBear: 0.8,
-  pChopChop: 0.6,
+  minConfidencePct: 82,
+  pBullBull: 0.84,
+  pBearBear: 0.84,
+  pChopChop: 0.72,
   startBalance: 1000,
-  riskPerTradePct: 10,
+  riskPerTradePct: 4,
   stopLossPct: 2,
   takeProfitPct: 4,
   exitOnChop: true,
   testWindowDays: 7,
-  maxOpenPositions: 3,
-  maxCorrelatedPositions: 3,
+  maxOpenPositions: 2,
+  maxCorrelatedPositions: 1,
   sizingMode: 'confidence_weighted',
-  autoOptimise: false,
-  autoRiskAdjust: false,
-  autoThresholdAdjust: false,
-  optimiserLookbackDays: 7
+  autoOptimise: true,
+  autoRiskAdjust: true,
+  autoThresholdAdjust: true,
+  optimiserLookbackDays: 7,
+  statePersistenceBars: 2,
+  flipCooldownBars: 2,
+  minPosteriorGapPct: 12,
+  useTrendFilter: true,
+  useAtrFilter: true,
+  useStructureFilter: true,
+  secondaryCorrelationScalePct: 40,
+  secondaryEntryMinQuality: 88
 };
 
 function toNumber(v, fallback) {
@@ -55,6 +63,14 @@ function normaliseConfig(value = {}) {
   cfg.autoRiskAdjust = Boolean(cfg.autoRiskAdjust);
   cfg.autoThresholdAdjust = Boolean(cfg.autoThresholdAdjust);
   cfg.optimiserLookbackDays = Math.max(3, Math.min(60, Math.round(toNumber(cfg.optimiserLookbackDays, DEFAULT_CONFIG.optimiserLookbackDays))));
+  cfg.statePersistenceBars = Math.max(1, Math.min(5, Math.round(toNumber(cfg.statePersistenceBars, DEFAULT_CONFIG.statePersistenceBars))));
+  cfg.flipCooldownBars = Math.max(0, Math.min(6, Math.round(toNumber(cfg.flipCooldownBars, DEFAULT_CONFIG.flipCooldownBars))));
+  cfg.minPosteriorGapPct = Math.max(2, Math.min(40, toNumber(cfg.minPosteriorGapPct, DEFAULT_CONFIG.minPosteriorGapPct)));
+  cfg.useTrendFilter = Boolean(cfg.useTrendFilter);
+  cfg.useAtrFilter = Boolean(cfg.useAtrFilter);
+  cfg.useStructureFilter = Boolean(cfg.useStructureFilter);
+  cfg.secondaryCorrelationScalePct = Math.max(10, Math.min(100, toNumber(cfg.secondaryCorrelationScalePct, DEFAULT_CONFIG.secondaryCorrelationScalePct)));
+  cfg.secondaryEntryMinQuality = Math.max(60, Math.min(99, toNumber(cfg.secondaryEntryMinQuality, DEFAULT_CONFIG.secondaryEntryMinQuality)));
   return cfg;
 }
 

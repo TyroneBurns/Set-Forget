@@ -43,11 +43,19 @@
         <div class="field"><label>Max correlated positions</label><input id="maxCorrelatedPositions" type="number"></div>
         <div class="field"><label>Sizing mode</label><select id="sizingMode"><option value="fixed">Fixed</option><option value="confidence_weighted">Confidence weighted</option></select></div>
         <div class="field"><label>Optimiser lookback days</label><input id="optimiserLookbackDays" type="number"></div>
+        <div class="field"><label>Persistence bars</label><input id="statePersistenceBars" type="number"></div>
+        <div class="field"><label>Flip cooldown bars</label><input id="flipCooldownBars" type="number"></div>
+        <div class="field"><label>Min posterior gap %</label><input id="minPosteriorGapPct" type="number" step="0.1"></div>
+        <div class="field"><label>Secondary correlated size %</label><input id="secondaryCorrelationScalePct" type="number"></div>
+        <div class="field"><label>Secondary entry min quality</label><input id="secondaryEntryMinQuality" type="number"></div>
 
         <label class="toggle-row"><input id="exitOnChop" type="checkbox"><span>Exit demo trades on chop</span></label>
         <label class="toggle-row"><input id="autoOptimise" type="checkbox"><span>Auto-optimise controls</span></label>
         <label class="toggle-row"><input id="autoRiskAdjust" type="checkbox"><span>Auto-adjust risk</span></label>
         <label class="toggle-row"><input id="autoThresholdAdjust" type="checkbox"><span>Auto-adjust threshold</span></label>
+        <label class="toggle-row"><input id="useTrendFilter" type="checkbox"><span>Use trend filter</span></label>
+        <label class="toggle-row"><input id="useAtrFilter" type="checkbox"><span>Use ATR expansion filter</span></label>
+        <label class="toggle-row"><input id="useStructureFilter" type="checkbox"><span>Use structure confirmation</span></label>
 
         <div class="settings-actions">
           <button class="btn ghost" id="settingsClose" type="button">Close</button>
