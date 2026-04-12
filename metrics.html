@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Set & Forget — Metrics Board</title>
+  <meta name="theme-color" content="#060816">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="wrap metrics-wrap">
+    <section class="card hero">
+      <div class="head">
+        <div class="logo">SF</div>
+        <div class="hero-copy">
+          <div class="kicker">Metrics board</div>
+          <div class="title">System edge dashboard</div>
+        </div>
+        <a class="nav-link-pill" href="./index.html">Back to app</a>
+      </div>
+      <div class="notice">This page is for decision-making, not trading. It shows expectancy, edge quality, flip damage, chop damage, bucket performance and daily behaviour so you can decide when to tighten or scale.</div>
+    </section>
+
+    <section class="card">
+      <div class="panel">
+        <div class="row top-row">
+          <div>
+            <div class="kicker">System status</div>
+            <div class="title-sm" id="healthStatusText">Loading…</div>
+          </div>
+          <div class="pill" id="healthStatusPill">Checking</div>
+        </div>
+        <div class="notice slim" id="healthSummary">Reading trade history…</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="panel">
+        <div class="row">
+          <div>
+            <div class="kicker">Core edge metrics</div>
+            <div class="title-sm">Expectancy and payoff</div>
+          </div>
+          <div class="chart-meta" id="sampleSizeText">0 trades</div>
+        </div>
+        <div class="grid-2 metrics-grid-3">
+          <div class="stat"><div class="small">Win rate</div><div class="big" id="winRate">0%</div></div>
+          <div class="stat"><div class="small">Avg win</div><div class="big" id="avgWin">£0.00</div></div>
+          <div class="stat"><div class="small">Avg loss</div><div class="big" id="avgLoss">£0.00</div></div>
+          <div class="stat"><div class="small">Payoff ratio</div><div class="big" id="payoffRatio">0.00</div></div>
+          <div class="stat"><div class="small">Expectancy / trade</div><div class="big" id="expectancy">£0.00</div></div>
+          <div class="stat"><div class="small">Profit factor</div><div class="big" id="profitFactor">0.00</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card chart-card">
+      <div class="panel">
+        <div class="row">
+          <div>
+            <div class="kicker">Daily realised PnL</div>
+            <div class="title-sm" id="dailyHeadline">Last 14 days</div>
+          </div>
+          <div class="chart-meta" id="dailyMeta">Closed trades by day</div>
+        </div>
+        <canvas id="dailyCanvas" height="180"></canvas>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="panel">
+        <div class="row">
+          <div>
+            <div class="kicker">Leak map</div>
+            <div class="title-sm">Where PnL is leaking</div>
+          </div>
+          <div class="chart-meta">By close reason</div>
+        </div>
+        <div class="grid-2" id="reasonGrid"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="panel">
+        <div class="row">
+          <div>
+            <div class="kicker">Quality buckets</div>
+            <div class="title-sm">Where edge starts</div>
+          </div>
+          <div class="chart-meta">Closed trades by quality</div>
+        </div>
+        <div class="grid-2" id="qualityGrid"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="panel">
+        <div class="row">
+          <div>
+            <div class="kicker">Duration analysis</div>
+            <div class="title-sm">How long winners need</div>
+          </div>
+          <div class="chart-meta">Closed trades by duration</div>
+        </div>
+        <div class="grid-2" id="durationGrid"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="panel">
+        <div class="row">
+          <div>
+            <div class="kicker">Market breakdown</div>
+            <div class="title-sm">Pair by pair performance</div>
+          </div>
+          <div class="chart-meta">Closed trades</div>
+        </div>
+        <div class="list" id="pairList"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="panel">
+        <div class="row">
+          <div>
+            <div class="kicker">Recent closed trades</div>
+            <div class="title-sm">Latest behaviour</div>
+          </div>
+          <div class="chart-meta" id="recentMeta">Most recent closes</div>
+        </div>
+        <div class="list" id="recentClosedList"></div>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="./metrics.js"></script>
+</body>
+</html>

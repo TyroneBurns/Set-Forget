@@ -116,3 +116,16 @@ body{min-height:100vh}
   .trade-results{grid-template-columns:1fr}
   .trade-details{grid-template-columns:1fr 1fr}
 }
+
+
+.hero-actions{padding:0 16px 16px}
+.nav-link-pill{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-height:42px;padding:0 14px;border-radius:999px;border:1px solid rgba(127,101,255,.35);
+  background:rgba(106,92,255,.14);color:var(--text);text-decoration:none;font-weight:700;font-size:13px
+}
+.metrics-wrap{max-width:780px}
+.metrics-grid-3{grid-template-columns:repeat(3,1fr)}
+@media (max-width:560px){
+  .metrics-grid-3{grid-template-columns:1fr 1fr}
+}
